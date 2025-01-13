@@ -1,0 +1,3 @@
+[submodule "milliampere/milliampere_code"]
+	path = milliampere/milliampere_code
+	url = git@github.com:Autoferry/milliAmpere.git
