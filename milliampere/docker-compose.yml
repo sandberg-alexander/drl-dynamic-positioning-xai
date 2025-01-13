@@ -1,0 +1,52 @@
+services:
+  
+  rl:
+    build:
+      context: .
+      dockerfile: Dockerfile.rl
+    container_name: rl
+    hostname: rl_container
+    depends_on:
+      - env
+    volumes:
+      - ../data/models:/app/models
+      - ./rl_code:/app/rl_code
+
+  env:
+    build: ./milliampere_code
+    #container_name: env
+    #hostname: env_container
+    environment:
+      DISPLAY: ${DISPLAY}
+      LD_LIBRARY_PATH: "/workspace/src/ma27"
+      ROS_LANG_DISABLE: 'genlisp;gennodejs;geneus'
+      ROS_LOG_DIR: '/logging/node_logs'
+      # ROS_MASTER_URI: http://env:11311
+      # ROS_HOSTNAME: env
+      CATKIN_ENABLE_TESTING: '0'
+      QT_X11_NO_MITSHM: 1
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
+    # command: >
+    #   bash -c "
+    #   roscore
+    #   "
+    volumes:
+    #  - "./milliampere_code/workspace/src:/workspace/src:rw"  # Mount only the src directory
+      - "./milliampere_code/workspace:/workspace:rw"
+      - "./milliampere_code/logging:/logging:rw"
+      - "/tmp/.X11-unix:/tmp/.X11-unix:rw"
+      - "${HOME}/.Xauthority:/root/.Xauthority:rw"
+    ports:
+      - "80"
+      - "2020"
+      - "2030"
+      - "61200"
+    stdin_open: true
+    tty: true
+    networks:
+      - ros_net
+
+networks:
+  ros_net:
+    driver: bridge
