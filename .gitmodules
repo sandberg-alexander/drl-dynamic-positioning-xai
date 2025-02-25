@@ -1,0 +1,3 @@
+[submodule "project_mAXAI/milliAmpere1_code"]
+	path = project_mAXAI/milliAmpere1_code
+	url = git@github.com:Autoferry/milliAmpere.git
