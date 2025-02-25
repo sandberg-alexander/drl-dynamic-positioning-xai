@@ -72,7 +72,7 @@ services:
       bash -c "
       source /opt/ros/noetic/setup.bash &&
       roscore &
-      sleep 3
+      sleep 3 &&
       source /workspace/devel/setup.bash &&
       roslaunch /workspace/src/simulator.launch &
       rosrun master_discovery_fkie master_discovery _mcast_group:=224.0.0.1 &
@@ -115,7 +115,7 @@ services:
       bash -c "
       source /opt/ros/noetic/setup.bash &&
       roscore &
-      sleep 3
+      sleep 3 &&
       source /workspace/devel/setup.bash &&
       roslaunch /workspace/src/simulator.launch &
       rosrun master_discovery_fkie master_discovery _mcast_group:=224.0.0.1 &
