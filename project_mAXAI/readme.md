@@ -22,7 +22,7 @@ You only need to compose up the eval environments during training.
 ```bash
 docker compose build
 docker compose up -d
-docker exec -it {contianer} bash # container = {rl, xai, render, env1, eval_env1, eval_env2}
+docker exec -it {contianer} bash # container = {drl, xai, render, env1, eval_env1, eval_env2}
 ```
 
 ## Train

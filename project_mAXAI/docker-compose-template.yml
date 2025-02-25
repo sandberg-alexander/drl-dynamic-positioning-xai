@@ -1,11 +1,11 @@
 services:
   
-  rl:
+  drl:
     build:
       context: .
-      dockerfile: Dockerfile.rl
-    container_name: rl
-    hostname: rl_container
+      dockerfile: Dockerfile.drl
+    container_name: drl
+    hostname: drl_container
     depends_on:
 PLACEHOLDER_DEPENDENCIES
     environment:
@@ -14,16 +14,19 @@ PLACEHOLDER_DEPENDENCIES
       - ROS_MASTER_URIS=PLACEHOLDER_URIS
       - ROS_HOSTNAMES=PLACEHOLDER_HOSTNAMES
     command: >
-      bash -c "
+      bash -c '
       source /opt/ros/noetic/setup.bash &&
       roscore &
-      sleep 3
+      sleep 3 &&
       rosrun master_discovery_fkie master_discovery _mcast_group:=224.0.0.1 &
-      rosrun master_sync_fkie master_sync &  
+      rosrun master_sync_fkie master_sync &
       tail -f /dev/null
+      '
     volumes:
-      - ./rl_code:/app/rl_code
+      - ../local_env/plots/drl:/app/plots
+      - ./drl_code:/app/drl_code
       - ../data/models:/app/models
+      - ../data/gym_env:/app
     networks:
       - ros_net
   
@@ -41,9 +44,9 @@ PLACEHOLDER_DEPENDENCIES
       - ROS_MASTER_URIS=PLACEHOLDER_URIS
       - ROS_HOSTNAMES=PLACEHOLDER_HOSTNAMES
     volumes:
-      - ../analysis/plots/xai:/app/plots
+      - ../local_env/plots/xai:/app/plots
       - ../data/models:/app/models
-      - ./rl_code/milliampereROS_env:/app/milliampereROS_env
+      - ../data/gym_env:/app
       - ./xai_code:/app/xai_code
     networks:
       - ros_net
@@ -51,7 +54,7 @@ PLACEHOLDER_DEPENDENCIES
   ##########################################################################
   #BEGIN_ENV_BLOCK
   ENV_NAME_PLACEHOLDER:
-    build: ./milliampere_code
+    build: ./milliAmpere1_code
     container_name: ENV_NAME_PLACEHOLDER
     hostname: ENV_NAME_PLACEHOLDER
     environment:
@@ -78,9 +81,9 @@ PLACEHOLDER_DEPENDENCIES
       "
 
     volumes:
-    #  - "./milliampere_code/workspace/src:/workspace/src:rw"  # Mount only the src directory
-      - "./milliampere_code/workspace:/root/workspace:rw"
-      - "./milliampere_code/logging:/logging:rw"
+    #  - "./milliAmpere1_code/workspace/src:/workspace/src:rw"  # Mount only the src directory
+      - "./milliAmpere1_code/workspace:/root/workspace:rw"
+      - "./milliAmpere1_code/logging:/logging:rw"
       - "/tmp/.X11-unix:/tmp/.X11-unix:rw"
       - "${HOME}/.Xauthority:/root/.Xauthority:rw"
     ports:

@@ -1,0 +1,144 @@
+services:
+  
+  drl:
+    build:
+      context: .
+      dockerfile: Dockerfile.drl
+    container_name: drl
+    hostname: drl_container
+    depends_on:
+      - env_1
+      - eval_env_1
+    environment:
+      - ROS_MASTER_URI=http://env_1:11311
+      - ROS_HOSTNAME=env_1
+      - ROS_MASTER_URIS=http://env_1:11311,http://eval_env_1:11311
+      - ROS_HOSTNAMES=env_1,eval_env_1
+    command: >
+      bash -c '
+      source /opt/ros/noetic/setup.bash &&
+      roscore &
+      sleep 3 &&
+      rosrun master_discovery_fkie master_discovery _mcast_group:=224.0.0.1 &
+      rosrun master_sync_fkie master_sync &
+      tail -f /dev/null
+      '
+    volumes:
+      - ../local_env/plots/drl:/app/plots
+      - ./drl_code:/app/drl_code
+      - ../data/models:/app/models
+      - ../data/gym_env:/app
+    networks:
+      - ros_net
+  
+  xai:
+    build:
+      context: .
+      dockerfile: Dockerfile.xai
+    container_name: xai
+    hostname: xai_contatiner
+    depends_on:
+      - env_1
+      - eval_env_1
+    environment:
+      - ROS_MASTER_URI=http://env_1:11311
+      - ROS_HOSTNAME=env_1
+      - ROS_MASTER_URIS=http://env_1:11311,http://eval_env_1:11311
+      - ROS_HOSTNAMES=env_1,eval_env_1
+    volumes:
+      - ../local_env/plots/xai:/app/plots
+      - ../data/models:/app/models
+      - ../data/gym_env:/app
+      - ./xai_code:/app/xai_code
+    networks:
+      - ros_net
+
+  env_1:
+    build: ./milliAmpere1_code
+    container_name: env_1
+    hostname: env_1
+    environment:
+      DISPLAY: ${DISPLAY}
+      LD_LIBRARY_PATH: "/workspace/src/ma27"
+      ROS_LANG_DISABLE: 'genlisp;gennodejs;geneus'
+      ROS_LOG_DIR: '/logging/node_logs'
+      ROS_MASTER_URI: http://env_1:11311
+      ROS_HOSTNAME: env_1
+      CATKIN_ENABLE_TESTING: '0'
+      QT_X11_NO_MITSHM: 1
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
+    command: >
+      bash -c "
+      source /opt/ros/noetic/setup.bash &&
+      roscore &
+      sleep 3
+      source /workspace/devel/setup.bash &&
+      roslaunch /workspace/src/simulator.launch &
+      rosrun master_discovery_fkie master_discovery _mcast_group:=224.0.0.1 &
+      rosrun master_sync_fkie master_sync &
+      tail -f /dev/null
+      "
+
+    volumes:
+    #  - "./milliAmpere1_code/workspace/src:/workspace/src:rw"  # Mount only the src directory
+      - "./milliAmpere1_code/workspace:/workspace:rw"
+      - "./milliAmpere1_code/logging:/logging:rw"
+      - "/tmp/.X11-unix:/tmp/.X11-unix:rw"
+      - "${HOME}/.Xauthority:/root/.Xauthority:rw"
+    ports:
+      - "80"
+      - "2020"
+      - "2030"
+      - "61200"
+    stdin_open: true
+    tty: true
+    networks:
+      - ros_net
+  
+  eval_env_1:
+    build: ./milliAmpere1_code
+    container_name: eval_env_1
+    hostname: eval_env_1
+    environment:
+      DISPLAY: ${DISPLAY}
+      LD_LIBRARY_PATH: "/workspace/src/ma27"
+      ROS_LANG_DISABLE: 'genlisp;gennodejs;geneus'
+      ROS_LOG_DIR: '/logging/node_logs'
+      ROS_MASTER_URI: http://eval_env_1:11311
+      ROS_HOSTNAME: eval_env_1
+      CATKIN_ENABLE_TESTING: '0'
+      QT_X11_NO_MITSHM: 1
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
+    command: >
+      bash -c "
+      source /opt/ros/noetic/setup.bash &&
+      roscore &
+      sleep 3
+      source /workspace/devel/setup.bash &&
+      roslaunch /workspace/src/simulator.launch &
+      rosrun master_discovery_fkie master_discovery _mcast_group:=224.0.0.1 &
+      rosrun master_sync_fkie master_sync &
+      tail -f /dev/null
+      "
+
+    volumes:
+    #  - "./milliAmpere1_code/workspace/src:/workspace/src:rw"  # Mount only the src directory
+      - "./milliAmpere1_code/workspace:/workspace:rw"
+      - "./milliAmpere1_code/logging:/logging:rw"
+      - "/tmp/.X11-unix:/tmp/.X11-unix:rw"
+      - "${HOME}/.Xauthority:/root/.Xauthority:rw"
+    ports:
+      - "80"
+      - "2020"
+      - "2030"
+      - "61200"
+    stdin_open: true
+    tty: true
+    networks:
+      - ros_net
+  
+networks:
+  ros_net:
+    driver: bridge
