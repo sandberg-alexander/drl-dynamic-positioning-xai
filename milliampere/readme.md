@@ -9,7 +9,14 @@
                                       |_|                                            
 ```           
 
+## Specify environments
+Specify number of training or testing environements and number of evaluation environments. Evaluation environments are used for training purposes.
+Execute the python script
+`.\customize_num_envs.py x y`
+where x is the number of environments and y is the number of evaluation environments
+
 ## Building
+Make sure you have the correct number of env(s) and eval_env(s).
 You only need to compose up the eval environments during training.
 
 ```bash
@@ -31,4 +38,8 @@ If you want to test without simulated wind, remove it.
 Enable 'Direct Actuator Control'.
 Then in the rl_agent container run the testing script
 `python3 test.py`
+
+WORKDIR /workspace
+RUN /bin/bash -c "source devel/setup.bash" 
+# && roslaunch src/simulator.launch && rosservice call /supervisor/switch_mode "mode: 'direct_actuator_control'" "
 

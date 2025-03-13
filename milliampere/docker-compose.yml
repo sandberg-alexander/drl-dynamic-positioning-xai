@@ -1,160 +1,105 @@
 services:
-  
-  rl:
+  ros_master:
+    image: ros:noetic-ros-core
+    container_name: ros_master
+    hostname: ros_master_container
+    networks:
+      rosnet:
+        aliases:
+          - ros_master
+    command: roscore
+
+  simulator:
+    build:
+      context: ./milliampere_code
+    container_name: simulator
+    hostname: simulator_container
+    depends_on:
+      - ros_master
+    networks:
+      rosnet:
+        aliases:
+          - simulator
+    environment:
+      DISPLAY: ${DISPLAY}
+      LD_LIBRARY_PATH: "/workspace/src/ma27"
+      ROS_LANG_DISABLE: 'genlisp;gennodejs;geneus'
+      ROS_LOG_DIR: '/logging/node_logs'
+      ROS_MASTER_URI: http://ros_master:11311
+      ROS_HOSTNAME: simulator
+      CATKIN_ENABLE_TESTING: '0'
+      QT_X11_NO_MITSHM: 1
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
+    volumes:
+      - "./milliampere_code/workspace/src:/workspace/src:rw"  # Mount only the src directory
+    #  - "./milliampere_code/workspace:/workspace:rw"
+      - "./milliampere_code/logging:/logging:rw"
+      - "/tmp/.X11-unix:/tmp/.X11-unix:rw"
+      - "${HOME}/.Xauthority:/root/.Xauthority:rw"
+    ports:
+      - "80:80"
+      - "2020:2020"
+      - "2030:2030"
+      - "61200:61200"
+    stdin_open: true
+    tty: true
+
+  rl_agent:
     build:
       context: .
       dockerfile: Dockerfile.rl
-    container_name: rl
+    container_name: rl_agent
     hostname: rl_container
     depends_on:
-      - env_1
-      - env_2
-      - eval_env_1
-      - eval_env_2
+      - simulator
+    networks:
+      rosnet:
+        aliases:
+          - rl_agent
+    environment:
+      - DISPLAY=${DISPLAY}
+      - ROS_MASTER_URI=http://ros_master:11311
+      - ROS_HOSTNAME=rl_agent
+      - QT_X11_NO_MITSHM=1
     volumes:
-      - ../data/models:/app/models
+      - ${HOME}/.Xauthority:/root/.Xauthority:rw
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ./rl_code:/app/rl_code
+      - ./models:/app/models
+      - ./logs:/app/logs
+    devices:
+      - /dev/dri:/dev/dri  # Required for hardware acceleration (optional)
+    init: true  # Add this line
 
-  env_1:
-    build: ./milliampere_code
-    container_name: env_1
-    hostname: env_1_container
-    environment:
-      DISPLAY: ${DISPLAY}
-      LD_LIBRARY_PATH: "/workspace/src/ma27"
-      ROS_LANG_DISABLE: 'genlisp;gennodejs;geneus'
-      ROS_LOG_DIR: '/logging/node_logs'
-      # ROS_MASTER_URI: http://env:11311
-      # ROS_HOSTNAME: env
-      CATKIN_ENABLE_TESTING: '0'
-      QT_X11_NO_MITSHM: 1
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: all
-    # command: >
-    #   bash -c "
-    #   roscore
-    #   "
-    volumes:
-    #  - "./milliampere_code/workspace/src:/workspace/src:rw"  # Mount only the src directory
-      - "./milliampere_code/workspace:/workspace:rw"
-      - "./milliampere_code/logging:/logging:rw"
-      - "/tmp/.X11-unix:/tmp/.X11-unix:rw"
-      - "${HOME}/.Xauthority:/root/.Xauthority:rw"
-    ports:
-      - "80"
-      - "2020"
-      - "2030"
-      - "61200"
-    stdin_open: true
-    tty: true
+
+  xai_agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.xai
+    container_name: xai_agent
+    hostname: xai_container
+    depends_on:
+      - simulator
     networks:
-      - ros_net
-  
-  env_2:
-    build: ./milliampere_code
-    container_name: env_2
-    hostname: env_2_container
+      rosnet:
+        aliases:
+          - xai_agent
     environment:
-      DISPLAY: ${DISPLAY}
-      LD_LIBRARY_PATH: "/workspace/src/ma27"
-      ROS_LANG_DISABLE: 'genlisp;gennodejs;geneus'
-      ROS_LOG_DIR: '/logging/node_logs'
-      # ROS_MASTER_URI: http://env:11311
-      # ROS_HOSTNAME: env
-      CATKIN_ENABLE_TESTING: '0'
-      QT_X11_NO_MITSHM: 1
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: all
-    # command: >
-    #   bash -c "
-    #   roscore
-    #   "
+      - DISPLAY=${DISPLAY}
+      - ROS_MASTER_URI=http://ros_master:11311
+      - ROS_HOSTNAME=xai_agent
+      - QT_X11_NO_MITSHM=1
     volumes:
-    #  - "./milliampere_code/workspace/src:/workspace/src:rw"  # Mount only the src directory
-      - "./milliampere_code/workspace:/workspace:rw"
-      - "./milliampere_code/logging:/logging:rw"
-      - "/tmp/.X11-unix:/tmp/.X11-unix:rw"
-      - "${HOME}/.Xauthority:/root/.Xauthority:rw"
-    ports:
-      - "80"
-      - "2020"
-      - "2030"
-      - "61200"
-    stdin_open: true
-    tty: true
-    networks:
-      - ros_net
-  
-  eval_env_1:
-    build: ./milliampere_code
-    container_name: eval_env_1
-    hostname: eval_env_1_container
-    environment:
-      DISPLAY: ${DISPLAY}
-      LD_LIBRARY_PATH: "/workspace/src/ma27"
-      ROS_LANG_DISABLE: 'genlisp;gennodejs;geneus'
-      ROS_LOG_DIR: '/logging/node_logs'
-      # ROS_MASTER_URI: http://env:11311
-      # ROS_HOSTNAME: env
-      CATKIN_ENABLE_TESTING: '0'
-      QT_X11_NO_MITSHM: 1
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: all
-    # command: >
-    #   bash -c "
-    #   roscore
-    #   "
-    volumes:
-    #  - "./milliampere_code/workspace/src:/workspace/src:rw"  # Mount only the src directory
-      - "./milliampere_code/workspace:/workspace:rw"
-      - "./milliampere_code/logging:/logging:rw"
-      - "/tmp/.X11-unix:/tmp/.X11-unix:rw"
-      - "${HOME}/.Xauthority:/root/.Xauthority:rw"
-    ports:
-      - "80"
-      - "2020"
-      - "2030"
-      - "61200"
-    stdin_open: true
-    tty: true
-    networks:
-      - ros_net
-  
-  eval_env_2:
-    build: ./milliampere_code
-    container_name: eval_env_2
-    hostname: eval_env_2_container
-    environment:
-      DISPLAY: ${DISPLAY}
-      LD_LIBRARY_PATH: "/workspace/src/ma27"
-      ROS_LANG_DISABLE: 'genlisp;gennodejs;geneus'
-      ROS_LOG_DIR: '/logging/node_logs'
-      # ROS_MASTER_URI: http://env:11311
-      # ROS_HOSTNAME: env
-      CATKIN_ENABLE_TESTING: '0'
-      QT_X11_NO_MITSHM: 1
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: all
-    # command: >
-    #   bash -c "
-    #   roscore
-    #   "
-    volumes:
-    #  - "./milliampere_code/workspace/src:/workspace/src:rw"  # Mount only the src directory
-      - "./milliampere_code/workspace:/workspace:rw"
-      - "./milliampere_code/logging:/logging:rw"
-      - "/tmp/.X11-unix:/tmp/.X11-unix:rw"
-      - "${HOME}/.Xauthority:/root/.Xauthority:rw"
-    ports:
-      - "80"
-      - "2020"
-      - "2030"
-      - "61200"
-    stdin_open: true
-    tty: true
-    networks:
-      - ros_net
-  
+      - ${HOME}/.Xauthority:/root/.Xauthority:rw
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ./xai_code:/app/xai_code
+      - ./models:/app/models
+      - ./logs:/app/logs
+    devices:
+      - /dev/dri:/dev/dri  # Required for hardware acceleration (optional)
+    init: true  # Add this line
+
+
 networks:
-  ros_net:
-    driver: bridge
+  rosnet:

@@ -39,39 +39,60 @@ def main():
 
     env_services_str = []
     env_dependencies_str = []
+    env_uris_str = []
+    env_hostnames_str = []
 
     for i in range(1, n_envs + 1):
         service_name = f"env_{i}"
         # Replace placeholders in the block
         block_instance = env_block.replace("ENV_NAME_PLACEHOLDER", service_name)
         block_instance = block_instance.replace("ENV_HOSTNAME_PLACEHOLDER", service_name + "_container")
+        block_instance = block_instance.replace("ENV_URI_PLACEHOLDER", "http://" + service_name + ":11311")
 
         # Add the environment services
         env_services_str.append("\n" + block_instance)
         # Add a depends_on entry
         env_dependencies_str.append(f"      - {service_name}")
-
+        # Add the ROS uri
+        env_uris_str.append("http://" + service_name + ":11311")
+        env_hostnames_str.append(service_name)
+    
     for i in range(1, n_eval_envs + 1):
         service_name = f"eval_env_{i}"
         # Replace placeholders in the block
         block_instance = env_block.replace("ENV_NAME_PLACEHOLDER", service_name)
-        block_instance = block_instance.replace("ENV_HOSTNAME_PLACEHOLDER", service_name + "_container")
+        #block_instance = block_instance.replace("ENV_HOSTNAME_PLACEHOLDER", service_name + "_container")
+        block_instance = block_instance.replace("ENV_URI_PLACEHOLDER", "http://" + service_name + ":11311")
 
         # Add the environment services
         env_services_str.append("\n" + block_instance)
         # Add a depends_on entry
         env_dependencies_str.append(f"      - {service_name}")
+        # Add the ROS uri
+        env_uris_str.append("http://" + service_name + ":11311")
+        env_hostnames_str.append(service_name)
     
     # Join them
     env_services_str_final = "".join(env_services_str)
     env_dependencies_str_final = "\n".join(env_dependencies_str)
+    env_uris_str_final = ",".join(env_uris_str)
+    env_hostnames_str_final = ",".join(env_hostnames_str)
     
     final_compose = cleaned_templete.replace(
         "PLACEHOLDER_DEPENDENCIES",
         env_dependencies_str_final if env_dependencies_str_final else ""
     )
+    final_compose = final_compose.replace(
+        "PLACEHOLDER_URIS",
+        env_uris_str_final if env_uris_str_final else ""
+    )
+    
+    final_compose = final_compose.replace(
+        "PLACEHOLDER_HOSTNAMES",
+        env_hostnames_str_final if env_hostnames_str_final else ""
+    )
 
-    insertion_point = final_compose.find("networks:\n")
+    insertion_point = final_compose.find("networks:\n  ros_net:")
     #insertion_point = block_start
     if insertion_point == -1:
         final_compose = final_compose + env_services_str_final
