@@ -293,7 +293,7 @@ class BodyRender(VesselRender):
         
         center = self._world_2_pixels(np.zeros((1,2))).ravel()
         self.draw_arrow(self._degrees2pygame(alpha_d), self._scalar2pygame(n_d), Color.DESIRED_YELLOW.value, center)
-        moment_d, moment_norm = self.calulate_total_moment(thrusters)
+        moment_norm = self.calulate_total_moment(thrusters)
         radius = self._scalar2pygame(self.VESSEL_MOMENT_MARKER)
         moment_norm *= self.SCALE/radius
         self._draw_curved_arrow(moment_norm, center, Color.DESIRED_YELLOW.value, radius)
@@ -349,15 +349,15 @@ class BodyRender(VesselRender):
         pygame.draw.polygon(self.surface, color, [tip, left_corner, right_corner])
 
     def calulate_total_moment(self, thrusters):
-        total_moment = 0.0
         total_moment_prime = 0.0
-        for (x,y), (n, alpha) in zip(self.thruster_positions, thrusters):
-            F = n * np.array([np.cos(np.deg2rad(alpha)), np.sin(np.deg2rad(alpha))])
-            M =  self._scalar2pygame(x) * F[1] + self._scalar2pygame(y) * F[0]
-            M_prime = x*F[1] + y*F[0]
-            total_moment += M
+        for i, ((x,y), (n, alpha)) in enumerate(zip(self.thruster_positions, thrusters)):
+            rad = np.deg2rad(90*(i+1)-alpha)
+            if x*y < 0:
+                M_prime = abs(x) * n * np.cos(rad) + abs(y) * n * np.sin(rad)
+            else:
+                M_prime = abs(x) * n * np.sin(rad) + abs(y) * n * np.cos(rad)
             total_moment_prime += M_prime
-        return total_moment, total_moment_prime
+        return total_moment_prime
     
     
 
@@ -757,7 +757,7 @@ class ShapExplainRender(VesselRender, Utilities):
                 (s_prime[2], thrusters[2][1]),
                 (s_prime[3], thrusters[3][1]),
             ]
-            moment, moment_norm = self._calulate_total_moment(vectors)
+            moment_norm = self._calulate_total_moment(vectors)
             s = np.append(s,moment_norm)
             x_or_y[i] = np.argmax(np.abs(s))
  
@@ -774,20 +774,20 @@ class ShapExplainRender(VesselRender, Utilities):
             ang = np.deg2rad(thruster[1])
             s += thruster[0] * np.array([np.cos(ang),np.sin(ang)])
 
-        moment, moment_norm = self._calulate_total_moment(thrusters)
+        moment_norm = self._calulate_total_moment(thrusters)
         s = np.append(s,moment_norm)
         return s
-
+    
     def _calulate_total_moment(self, thrusters):
-        total_moment = 0.0
         total_moment_prime = 0.0
-        for (x,y), (n, alpha) in zip(self.thruster_positions, thrusters):
-            F = n * np.array([np.cos(np.deg2rad(alpha)), np.sin(np.deg2rad(alpha))])
-            M =  self._scalar2pygame(x) * F[1] + self._scalar2pygame(y) * F[0]
-            M_prime = x*F[1] + y*F[0]
-            total_moment += M
+        for i, ((x,y), (n, alpha)) in enumerate(zip(self.thruster_positions, thrusters)):
+            rad = np.deg2rad(90*(i+1)-alpha)
+            if x*y < 0:
+                M_prime = abs(x) * n * np.cos(rad) + abs(y) * n * np.sin(rad)
+            else:
+                M_prime = abs(x) * n * np.sin(rad) + abs(y) * n * np.cos(rad)
             total_moment_prime += M_prime
-        return total_moment, total_moment_prime
+        return total_moment_prime
         
     def _draw_explaination(self, shap_values_EV, shap_values_RPM, thrusters, error_x, error_y, error_psi, u_hat, v_hat, r_hat):
         
@@ -1065,7 +1065,7 @@ class ShapExplainRender(VesselRender, Utilities):
             y_total += r * np.sin(theta_rad)
 
         if len(list(vectors)) == 4:
-            moment, moment_norm = self._calulate_total_moment(vectors)
+            moment_norm = self._calulate_total_moment(vectors)
         else:
             moment_norm = None
 
