@@ -154,6 +154,8 @@ def main():
     sleep_time = 0.1
     shap_values_value_prev = np.zeros(14)
     explain_mode = 1
+    explain_vector = False
+    print_mode = -1
 
     agent = Agent()
     rospy.sleep(sleep_time*3)
@@ -176,7 +178,16 @@ def main():
                                 print("Unpaused ...")
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_s:
                     explain_mode *= -1
-                    print("Switching explain mode") 
+                    print("Switching explain mode")
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_t:
+                    print_mode *= -1
+                    print("Togle printing vectors") 
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
+                    if explain_vector:
+                        explain_vector = False
+                    else:
+                        explain_vector = True
+                    print("Togle explain vector")
 
             
             # Test
@@ -291,6 +302,9 @@ def main():
             list_of_lists3 = shap_values_value - shap_values_value_prev
             try:
                 #print("\n",shap_values_value)
+                if print_mode == 1:
+                    print(vectors)
+                    print()
                 render.render_frame(
                     list_of_lists1,
                     list_of_lists2,
@@ -305,7 +319,8 @@ def main():
                     obs.x_tilde*10,
                     obs.psi_tilde*180,
                     explain_mode,
-                    base_vectors
+                    base_vectors,
+                    explain_vector
                 )
                 #shap_values_value_prev = shap_values_value.copy()
             except pygame.error as e:

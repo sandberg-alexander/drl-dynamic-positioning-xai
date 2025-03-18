@@ -288,6 +288,7 @@ class BodyRender(VesselRender):
                              (px - 10 * np.cos(perp_angle), py - 10 * np.sin(perp_angle)),
                              (px + 10 * np.cos(perp_angle), py + 10 * np.sin(perp_angle)), width=2)
             pygame.draw.circle(self.surface, Color.BLACK.value, (px,py), radius=3)
+            pygame.draw.circle(self.surface, Color.BLACK.value, (px-7*np.sin(perp_angle),py+7*np.cos(perp_angle)), radius=1)
 
     def _draw_force_and_moment(self, n_d, alpha_d, thrusters):
         
@@ -711,6 +712,7 @@ class ShapExplainRender(VesselRender, Utilities):
         self.explain_offset = 20
         self.explain_mode = -1
         self.RPM_true = True
+        self.explain_vector = False
 
         self.thruster_positions = np.array([[self.THRUSTER_X, -self.THRUSTER_Y],
                                             [self.THRUSTER_X, self.THRUSTER_Y],
@@ -1027,6 +1029,62 @@ class ShapExplainRender(VesselRender, Utilities):
                 # Extract polar coordinates
                 r1, theta1 = vec1
                 r2, theta2 = vec2
+                                
+                theta_sum = theta1+theta2
+                r_sum = r1+r2
+                
+                vectors.append((r_sum, theta_sum))
+        
+        # Add all vectors in the list
+        x_total = 0
+        y_total = 0
+        
+        for vec in vectors:
+            r, theta = vec
+            theta_rad = np.radians(theta)
+            
+            x_total += r * np.cos(theta_rad)
+            y_total += r * np.sin(theta_rad)
+
+        if len(list(vectors)) == 4:
+            moment_norm = self._calulate_total_moment(vectors)
+        else:
+            moment_norm = None
+
+        # Convert back to polar
+        r_result = np.sqrt(x_total**2 + y_total**2)
+        theta_result = np.degrees(np.arctan2(y_total, x_total))
+
+        return (r_result, theta_result, moment_norm)
+    
+
+    def _add_vectors_polar_old(self, list1, list2=None):
+        """
+        Add 2D vectors in polar coordinates, with vectors in list2 expressed
+        relative to the corresponding vectors in list1.
+        
+        Parameters:
+        list1 (list): List of vectors in polar coordinates [(r1, θ1), (r2, θ2), ...].
+        list2 (list, optional): Second list of vectors of the same length as list1,
+                            expressed relative to the corresponding vectors in list1.
+        
+        Returns:
+        tuple: Resultant vector in polar coordinates (r, θ).
+        """
+        
+        # If only one list is provided
+        if list2 is None:
+            vectors = list1
+        else:
+            # If two lists are provided, add corresponding vectors with list2 in relative frame
+            if len(list1) != len(list2):
+                raise ValueError("Both lists must have the same length.")
+            
+            vectors = []
+            for vec1, vec2 in zip(list1, list2):
+                # Extract polar coordinates
+                r1, theta1 = vec1
+                r2, theta2 = vec2
                 
                 # Convert to radians
                 theta1_rad = np.radians(theta1)
@@ -1095,22 +1153,32 @@ class ShapExplainRender(VesselRender, Utilities):
         tot_vector = self._add_vectors_polar([tot_vector_base[:2],(-base_vector[0],base_vector[1])])
         _,_,moment = self._calculate_ad(thrusters)
 
+
         radius = 30
-        #self._draw_curved_arrow(self._scalar2pygame(tot_vector_base[2])/(1200*radius), self.center, Color.PURPLE.value, radius=radius+10)
-        #self._draw_curved_arrow(self._scalar2pygame(moment)/radius, self.center, Color.VELOCITY_GREEN.value, radius=radius+10)
+        if self.explain_vector:
+            # Angular RPMS for all SHAP features (estimate of total angular RPM)
+            self._draw_curved_arrow(self._scalar2pygame(tot_vector_base[2])/(1200*radius), self.center, Color.PURPLE.value, radius=radius+10)
+            # Total angular RPM
+            self._draw_curved_arrow(self._scalar2pygame(moment)/radius, self.center, Color.VELOCITY_GREEN.value, radius=radius+10)
         self._draw_curved_arrow(self._scalar2pygame(main_feature_vector_base[2])/(1200*radius), self.center, Color.DESIRED_LIGHT_YELLOW.value, radius=radius, arrowhead_length=5, arrowhead_widht=5)
               
-        
+        # Base vector
         #self._draw_arrow(self._degrees2pygame(base_vector[1]), self._scalar2pygame(base_vector[0]/1200), Color.BLACK.value, self.center)
         
         # Convert both to Cartesian
-        x1 = self._scalar2pygame(base_vector[0]/1200) * np.cos(np.deg2rad(base_vector[1]))
-        y1 = self._scalar2pygame(base_vector[0]/1200) * np.sin(np.deg2rad(base_vector[1]))
+        # x1 = self._scalar2pygame(base_vector[0]/1200) * np.cos(np.deg2rad(base_vector[1]))
+        # y1 = self._scalar2pygame(base_vector[0]/1200) * np.sin(np.deg2rad(base_vector[1]))
 
+        # Thruster vector from base for all SHAP features
         #self._draw_arrow(self._degrees2pygame(tot_vector[1]), self._scalar2pygame(tot_vector[0]/1200), Color.RED.value, (self.center[0]+y1,self.center[1]-x1))
-        #self._draw_arrow(self._degrees2pygame(tot_vector_base[1]), self._scalar2pygame(tot_vector_base[0]/1200), Color.PURPLE.value, self.center)
-        #self._draw_arrow(self._degrees2pygame(alpha_d), self._scalar2pygame(n_d), Color.VELOCITY_GREEN.value, self.center)
         
+        if self.explain_vector:
+            # Thruster vector for all SHAP features (estimate of totalt thruster vector)
+            self._draw_arrow(self._degrees2pygame(tot_vector_base[1]), self._scalar2pygame(tot_vector_base[0]/1200), Color.PURPLE.value, self.center)
+            # Total thruster vector
+            self._draw_arrow(self._degrees2pygame(alpha_d), self._scalar2pygame(n_d), Color.VELOCITY_GREEN.value, self.center)
+        
+        # Thruster vector from base for single SHAP feature
         #self._draw_arrow(self._degrees2pygame(main_feature_vector[1]), self._scalar2pygame(main_feature_vector[0]/1200), Color.DESIRED_LIGHT_YELLOW.value, (self.center[0]+y1,self.center[1]-x1))
         self._draw_arrow(self._degrees2pygame(main_feature_vector_base[1]), self._scalar2pygame(main_feature_vector_base[0]/1200), Color.DESIRED_LIGHT_YELLOW.value, self.center, arrowhead_width=5, arrowhead_length=5)
 
@@ -1177,7 +1245,7 @@ class ShapExplainRender(VesselRender, Utilities):
         self.surface.blit(text_surface3, text_rect3)
 
 
-    def render(self, shap_values_EV, shap_values_RPM, thrusters, x_err, y_err, psi_err, u_hat, v_hat, r_hat, explain_mode, shap_values_angles, base_vectors, n_d, alpha_d):
+    def render(self, shap_values_EV, shap_values_RPM, thrusters, x_err, y_err, psi_err, u_hat, v_hat, r_hat, explain_mode, shap_values_angles, base_vectors, n_d, alpha_d, explain_vector):
         
         #self._find_explaination(shap_values_EV, n=1, list_in_list=False)
         if explain_mode != self.explain_mode:
@@ -1192,6 +1260,9 @@ class ShapExplainRender(VesselRender, Utilities):
             shap_values = shap_values_RPM
         else:
             shap_values = shap_values_EV
+
+        if explain_vector != self.explain_vector:
+            self.explain_vector = explain_vector
 
         self._find_explaination(shap_values, n=1, list_in_list=self.RPM_true)
         #self.idx=1
@@ -1461,7 +1532,7 @@ class RenderExplaination():
 
 
 
-    def render_frame(self, shap_values1, shap_values2, shap_values3, thrusters, n_d, alpha_d, u_hat, v_hat, r_hat, x_err, y_err, psi_err, explain_mode, base_vectors):
+    def render_frame(self, shap_values1, shap_values2, shap_values3, thrusters, n_d, alpha_d, u_hat, v_hat, r_hat, x_err, y_err, psi_err, explain_mode, base_vectors, explain_vector):
         s = sum(shap_values3)
         if s < -0.8:
             self._screen.fill(Color.TABLEAU_RED.value)
@@ -1472,6 +1543,6 @@ class RenderExplaination():
         self._ned_window.render(x_err, y_err, psi_err)
         self._shap_window_top.render(shap_values1, shap_values3, explain_mode)
         #self._shap_window_bottom.render(shap_values2, shap_values3)
-        self._shap_explain_window.render(shap_values3, shap_values1, thrusters, x_err, y_err, psi_err, u_hat, v_hat, r_hat, explain_mode, shap_values2, base_vectors, n_d, alpha_d)
+        self._shap_explain_window.render(shap_values3, shap_values1, thrusters, x_err, y_err, psi_err, u_hat, v_hat, r_hat, explain_mode, shap_values2, base_vectors, n_d, alpha_d, explain_vector)
 
         pygame.display.flip()
