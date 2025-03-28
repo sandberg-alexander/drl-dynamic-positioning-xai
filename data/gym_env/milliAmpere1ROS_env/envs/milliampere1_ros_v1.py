@@ -12,12 +12,11 @@ import math
 
 from geometry_msgs.msg import PoseStamped
 from custom_msgs.msg import ActuatorSetpoints
-from sim_milliampere.srv import ResetState
 
-class MilliampereRosEnv4Thrusters(gym.Env):
+class MilliAmpere1RosEnvV1(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 4}
 
-    def __init__(self, max_time_steps=20*2, render_mode=None):
+    def __init__(self, max_time_steps=3000, render_mode=None):
 
         self.action_space = spaces.Box(-1.0, 1.0, shape=(8,), dtype=float)
         self.observation_space = spaces.Box(-1.0, 1.0, shape=(14,), dtype=float)
@@ -30,27 +29,61 @@ class MilliampereRosEnv4Thrusters(gym.Env):
         self.pub_act_ref_4 = rospy.Publisher('/actuator_ref_4', ActuatorSetpoints, queue_size=1)
         rospy.Subscriber('/navigation/pose', PoseStamped, self._pose_callback)
 
-        # ROS services
-        self.reset_service = rospy.ServiceProxy('/sim_vessel/reset_state', ResetState)
-
         # ROS shutdown
         rospy.on_shutdown(self.close)
 
         # Constraints
-        self.max_thruster_rpm = 1200                # RPM
-        self.max_azimuth_angle = 180                # degrees
-        self.target_bounds = np.array([5,5,180])    # max meters from NED origo and max degrees
+        self.max_thruster_rpm = 900                 # RPM
+        self.max_azimuth_angle = 90                 # degrees
+        self.target_bounds = np.array([5,5,180])    # max meters from operating point in NED and max degrees
         self.max_distance = 10                      # max distance from target
-        self.max_heading_angle = 180                #
-        self.max_linear_speed = 3.5
-        self.max_angular_speed = 120                 ##### NEED TO TUNE!!!
+        self.max_heading_angle = 180                # degrees
+        self.max_linear_speed = 3.24                # m/s
+        self.max_angular_speed = 112.6              # degrees/s
         self.max_time_steps = max_time_steps
+        # Define angle constraints in radians
+        self.actuator_constraints = [
+            (np.pi/2, np.pi),       # Thruster 1: [90°, 180°]
+            (-np.pi, -np.pi/2),     # Thruster 2: [-180°, -90°]
+            (-np.pi/2, 0),          # Thruster 3: [-90°, 0°]
+            (0, np.pi/2)            # Thruster 4: [0°, 90°]
+        ]
+        # Define opposite quadrants for each thruster
+        self.opposite_quadrants = [
+            (-np.pi/2, 0),          # Opposite of Thruster 1: [-90°, 0°]
+            (0, np.pi/2),           # Opposite of Thruster 2: [0°, 90°]
+            (np.pi/2, np.pi),       # Opposite of Thruster 3: [90°, 180°]
+            (-np.pi, -np.pi/2)      # Opposite of Thruster 4: [-180°, -90°]
+        ]
 
         # Enviorment variables
         self.navigation_pose_data = None
         self.act_ref = [ActuatorSetpoints() for _ in range(4)]
         self.sleep_time = 0.1
         self.episode_counter = 0
+        self.north = 334.61                 # offset from NED origo in meters
+        self.east = 990.24                  # offset from NED origo in meters
+
+        self.obs_time = None
+        self.obs_time_prev = None
+        self.eta_obs = np.zeros(3)
+        self.eta_obs_prev = np.zeros(3)
+        self.epsilon_obs = None
+        self.epsilon = np.zeros(3)
+        self.est_nu_obs = None
+        self.est_nu = np.zeros(3)
+        self.observation = None
+        self.norm_observation = None
+        self.action = np.zeros(8)
+        self.action_prev = np.zeros(8)
+        self.norm_action = np.zeros(8)
+        self.norm_action_prev = np.zeros(8)
+        self.real_azimuth_angle = 0.0
+        self.thrusters = np.zeros(4)
+        self.thrusters_prev = np.zeros(4)
+        self.angles = np.array([135, -135, -45, 45])
+        self.angles_prev = np.array([135, -135, -45, 45])
+        
 
         # Reward weights and variance
         self.w_gauss            = 1.0
@@ -62,6 +95,7 @@ class MilliampereRosEnv4Thrusters(gym.Env):
         self.w_abs_n            = 0.3
         self.w_est_dot_n        = 0.05
         self.w_est_dot_alpha    = 0.01
+        self.w_constraint       = 1.5/(np.pi/4)
         # sigma values are squared
         sigma_d                 = 1.0       
         sigma_psi               = 5.0*50
@@ -98,35 +132,13 @@ class MilliampereRosEnv4Thrusters(gym.Env):
             self.R_gauss_render = np.exp(-0.5 * np.einsum('...i,ij,...j', diff, self.inv_sigma_render, diff))
             self.R_AS_gauss_render = np.exp(-0.5 * np.einsum('...i,ij,...j', diff, self.inv_sigma_AS_render, diff))
             self.max_reward = 1.0 #self.w_gauss + self.w_AS_gauss
-            self.min_reward = -0.1-0.1-0.1
+            self.min_reward = -0.1-0.1-0.1-0.25-0.25-0.25-0.25
                                   #np.exp(-0.5 * d**2 * self.inv_sigma[0][0])
                                   #np.exp(-0.5 * d**2 * self.inv_sigma_AS[0][0])
 
             self.window = pygame.display.set_mode((self.width + self.bar_width+50, self.height))
             pygame.display.set_caption('2D Multivariate Gaussian with Value Bar')
             self.clock = pygame.time.Clock()
-
-    ######################################
-    ########## init functions ############
-    
-    def _init_episode_var(self):
-        self.time_step = 0
-        self.target_pose = self.np_random.uniform(-1,1,3) * self.target_bounds
-        self.obs_time = None
-        self.obs_time_prev = None
-        self.eta_obs = np.zeros(3)
-        self.eta_obs_prev = np.zeros(3)
-        self.epsilon_obs = None
-        self.epsilon = np.zeros(3)
-        self.est_nu_obs = None
-        self.est_nu = np.zeros(3)
-        self.observation = None
-        self.norm_observation = None
-        self.action = np.zeros(8)
-        self.action_prev = np.zeros(8)
-        self.norm_action = np.zeros(8)
-        self.norm_action_prev = np.zeros(8)
-        self.real_azimuth_angle = 0.0
     
     ######################################
     ######## callback functions ##########
@@ -144,30 +156,13 @@ class MilliampereRosEnv4Thrusters(gym.Env):
         print(f"Episode: {self.episode_counter}")
 
         # Init episode variables
-        self._init_episode_var()
+        self.time_step = 0
+        self.target_pose = self.np_random.uniform(-1,1,3) * self.target_bounds + np.array([self.north, self.east, 0])
         print(f"New target at {self.target_pose}")
 
         # Init actuators
-        self._pub_actions(self.action)
-
-        # Init episode enviorment
-        rospy.wait_for_service('/sim_vessel/reset_state')
-        try:
-            self.reset_service(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-        except rospy.ServiceException as e:
-            print(f"Service call failed: {e}")
-
-        # Sleep to collect observations from ROS node
-        rospy.sleep(self.sleep_time*30)                    ##### SHOULD I REMOVE?
-
-                # Init episode enviorment
-        rospy.wait_for_service('/sim_vessel/reset_state')
-        try:
-            self.reset_service(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-        except rospy.ServiceException as e:
-            print(f"Service call failed: {e}")
-        
-        rospy.sleep(self.sleep_time)
+        self._calculate_actuator_inputs(self.action)
+        self._pub_actuator_inputs()
 
         observation = self._get_obs()
         normalized_observation = self._get_norm_obs(observation)
@@ -184,10 +179,14 @@ class MilliampereRosEnv4Thrusters(gym.Env):
         self.action_prev = self.action.copy()
         self.norm_action_prev = self.norm_action.copy()
         self.obs_time_prev = self.obs_time
+        self.thrusters_prev = self.thrusters.copy()
+        self.angles_prev = self.angles.copy()
 
         # Doing new action
         self.norm_action = action.copy()
-        self._pub_actions(action)
+        self.action = action.copy()*self.max_thruster_rpm
+        self._calculate_actuator_inputs(action)
+        self._pub_actuator_inputs()
 
         # Sleep to collect observations from ROS node
         rospy.sleep(self.sleep_time)                    ##### SHOULD I REMOVE?
@@ -259,7 +258,7 @@ class MilliampereRosEnv4Thrusters(gym.Env):
         self._draw_value_bar(self.window, z_value*10, center_color)
 
         # Draw additional value bars for negative rewards
-        self._draw_horizontal_value_bars(self.window, [self.R_vel, self.R_thrust, self.R_thrust_d], 3)
+        self._draw_horizontal_value_bars(self.window, [self.R_vel, self.R_thrust, self.R_thrust_d, self.R_constraint], 4)
 
         # Draw observations on the screen
         self._draw_observations(self.window)
@@ -345,7 +344,7 @@ class MilliampereRosEnv4Thrusters(gym.Env):
         epsilon_y_b = self.epsilon[1]
         epsilon_d = np.sqrt(epsilon_x_b**2+epsilon_y_b**2)
         if epsilon_d > 10:
-            print(f"Episode ended due to termination at epsilon_d = {epsilon_d}")
+            print(f"Episode ended due to t-ERM-ination at epsilon_d = {epsilon_d}")
             return True
         
         else:
@@ -354,7 +353,7 @@ class MilliampereRosEnv4Thrusters(gym.Env):
 
     def _is_truncated(self):
         if self.time_step > self.max_time_steps:
-            print(f"Episode ended due to truncation at epsilon = {self.epsilon}")
+            print(f"Episode ended due to t-RUNC-ation at epsilon = {self.epsilon}")
             return True
         else: return False
     
@@ -374,9 +373,36 @@ class MilliampereRosEnv4Thrusters(gym.Env):
         b=1000
         x= np.sqrt(norm_est_u**2 + norm_est_v**2 + est_r**2)
         self.R_vel = -0.1*(b**(-x)-1)/(b**(-np.sqrt(3))-1)
-        self.R_thrust = -0.1/4*(abs(self.norm_action[0])+abs(self.norm_action[1])+abs(self.norm_action[2])+abs(self.norm_action[3]))
-        self.R_thrust_d = -0.1/8*(abs(self.norm_action[0]-self.norm_action_prev[0])+abs(self.norm_action[1]-self.norm_action_prev[1])+abs(self.norm_action[2]-self.norm_action_prev[2])+abs(self.norm_action[3]-self.norm_action_prev[3]))
-        self.R_rest = self.R_vel + self.R_thrust + self.R_thrust_d
+        self.R_thrust = -0.1/4*(abs(self.thrusters[0])+abs(self.thrusters[1])+abs(self.thrusters[2])+abs(self.thrusters[3]))/self.max_thruster_rpm
+        self.R_thrust_d = -0.1/8*(abs(self.thrusters[0]-self.thrusters_prev[0])+abs(self.thrusters[1]-self.thrusters_prev[1])+abs(self.thrusters[2]-self.thrusters_prev[2])+abs(self.thrusters[3]-self.thrusters_prev[3]))/self.max_thruster_rpm
+        
+
+        self.R_constraint = 0.0
+
+        for i, angle in enumerate(self.angles/180*np.pi):
+            min_angle, max_angle = self.actuator_constraints[i]
+            min_minus_45 = self._ssa(min_angle - np.pi/4)
+            max_plus_45 = self._ssa(max_angle + np.pi/4)
+
+            # CASE 3: Thruster angle is within 45° less than min_angle
+            if min_minus_45 <= angle < self._ssa_alt(min_angle):
+                self.R_constraint -= -0.1 - self.w_constraint * abs(angle - self._ssa_alt(min_angle))
+
+            # CASE 4: Thruster angle is within 45° more than max_angle + 45°
+            elif max_plus_45 < angle < self._ssa(max_angle)+np.pi/2:
+                self.R_constraint -= -0.1 - self.w_constraint * abs(angle - self._ssa(max_angle)+np.pi/2)
+
+
+            # CASE 5: Thruster angle is within 45° more than max_angle
+            elif self._ssa(max_angle) < angle <= max_plus_45:
+                self.R_constraint -= -0.1 - self.w_constraint * abs(angle - max_plus_45)
+
+            
+            # CASE 6: Thruster angle is within 45° less than min_angle - 45°
+            elif  self._ssa_alt(min_angle)-np.pi/2 < angle < min_minus_45:
+                self.R_constraint -= -0.1 - self.w_constraint * abs(angle - self._ssa_alt(min_angle)-np.pi/2)
+
+        self.R_rest = self.R_vel + self.R_thrust + self.R_thrust_d + self.R_constraint
         # R_act = 0 
         # for i in range(4):
         #     n = self.norm_action[i]
@@ -388,16 +414,96 @@ class MilliampereRosEnv4Thrusters(gym.Env):
             
         #     R_act -= self.w_abs_n * abs(n) - self.w_est_dot_n * abs(est_dot_n) - self.w_est_dot_alpha * abs(est_dot_alpha)
         
-        reward = np.squeeze(self.R_gauss + self.R_AS_gauss)/1.4 + self.R_vel + self.R_thrust + self.R_thrust_d # + R_act
+        reward = np.squeeze(self.R_gauss + self.R_AS_gauss)/1.4 + self.R_vel + self.R_thrust + self.R_thrust_d + self.R_constraint # + R_act
         
         return reward
 
-    def _pub_actions(self, action):
-        for i in range(len(self.act_ref)):
-            self.action[i] = round(action[i] * self.max_thruster_rpm)
-            self.action[i+4] = round(action[i+4] * self.max_azimuth_angle)
-            self.act_ref[i].throttle_reference = round(action[i] * self.max_thruster_rpm)
-            self.act_ref[i].angle_reference = round(action[i+4] * self.max_azimuth_angle)
+    def _calculate_actuator_inputs(self, action):
+
+        # Process each thruster
+        for i in range(4):
+            x = action[i*2]
+            y = action[i*2 + 1]
+
+            if x == 0 and y == 0:
+                # add 0 thrust and angle
+                self.thrusters[i] = 0
+                self.angles[i] = self.angles_prev[i]
+                continue
+
+            angle = np.arctan2(y, x)
+            thrust = np.clip(np.sqrt(x**2 + y**2), 0, 1)
+
+            min_angle, max_angle = self.actuator_constraints[i]
+            opp_min_angle, opp_max_angle = self.opposite_quadrants[i]
+
+            min_minus_45 = self._ssa(min_angle - np.pi/4)
+            max_plus_45 = self._ssa(max_angle + np.pi/4)
+
+            # CASE 1: Thruster angle is within constraints
+            if min_angle <= angle <= max_angle:
+                pass
+            
+            # CASE 2: Thruster angle is in opposite quadrant
+            elif opp_min_angle <= angle <= opp_max_angle:
+                # Flip angle by 180° and negate thrust
+                angle = self._ssa(angle + np.pi)
+                thrust = -thrust
+
+            # CASE 3: Thruster angle is within 45° less than min_angle
+            elif min_minus_45 <= angle < self._ssa_alt(min_angle):
+                #print("Thruster", i+1, "is within 45° of constraints")
+                if i == 0 or i == 2:
+                    # Thruster 1 or 3
+                    angle = min_angle
+                    thrust = abs(y)
+                else:
+                    # Thruster 2 or 4
+                    angle = min_angle
+                    thrust = abs(x)
+
+            # CASE 4: Thruster angle is within 45° more than max_angle + 45°
+            elif max_plus_45 < angle < self._ssa(max_angle)+np.pi/2:
+                if i == 0 or i == 2:
+                    # Thruster 1 or 3
+                    angle = min_angle
+                    thrust = -abs(y)
+                else:
+                    # Thruster 2 or 4
+                    angle = min_angle
+                    thrust = -abs(x)
+
+            # CASE 5: Thruster angle is within 45° more than max_angle
+            elif self._ssa(max_angle) < angle <= max_plus_45:
+                if i == 0 or i == 2:
+                    # Thruster 1 or 3
+                    angle = max_angle
+                    thrust = abs(x)
+                else:
+                    # Thruster 2 or 4
+                    angle = max_angle
+                    thrust = abs(y)
+            
+            # CASE 6: Thruster angle is within 45° less than min_angle - 45°
+            else:
+                if i == 0 or i == 2:
+                    # Thruster 1 or 3
+                    angle = max_angle
+                    thrust = -abs(x)
+                else:
+                    # Thruster 2 or 4
+                    angle = max_angle
+                    thrust = -abs(y)
+            
+            self.angles[i] = angle / np.pi * 180
+            self.thrusters[i] = thrust * self.max_thruster_rpm
+
+
+    def _pub_actuator_inputs(self):
+        
+        for i in range(len(self.act_ref)):          
+            self.act_ref[i].throttle_reference = self.thrusters[i]
+            self.act_ref[i].angle_reference = self.angles[i]
 
         self.pub_act_ref_1.publish(self.act_ref[0])
         self.pub_act_ref_2.publish(self.act_ref[1])
@@ -412,6 +518,11 @@ class MilliampereRosEnv4Thrusters(gym.Env):
 
     def _ssa(self, angle):
         return (angle+180) % 360 - 180
+    
+    def _ssa_alt(self, angle):
+        if angle == -np.pi:
+            return np.pi
+        return (angle+np.pi) % (2*np.pi) - np.pi
     
     ######################################
     ######### render functions ###########
@@ -618,13 +729,18 @@ class MilliampereRosEnv4Thrusters(gym.Env):
 
     def _draw_horizontal_value_bars(self, screen, values, num_bars):
         min_value = -0.1 * 10
+        min_value_alt = -0.25 * 10
         max_value = 0 * 10
         bar_width = (self.bar_width - 10) // num_bars
         bar_spacing = 10  # Space between bars
         bar_x_offset = self.width - 70
         bar_height = 75  # Height of the bars
+        bar_height_alt = 75 * 2.5
 
         for i, value in enumerate(values):
+            if i == 3:
+                min_value = min_value_alt
+                bar_height = bar_height_alt
             bar_x = bar_x_offset + i * (bar_width + bar_spacing)
             bar_y = self.height - bar_height - 10
 
@@ -638,7 +754,7 @@ class MilliampereRosEnv4Thrusters(gym.Env):
             # Calculate and draw the filled portion of the bar
             fill_height = min(max(0, (value*10 - min_value) / (max_value - min_value) * bar_height), bar_height)
             fill_y = bar_y + bar_height - fill_height
-            color = (200, 200, 200) if value < 0 else (0, 255, 0)
+            color = (200, 200, 200) if value <= 0 else (0, 255, 0)
 
             pygame.draw.rect(
                 screen,
@@ -683,7 +799,12 @@ class MilliampereRosEnv4Thrusters(gym.Env):
             f'n_est_r = {self.norm_observation[5]:.3f}',
             f'n_prev_action = {self.norm_observation[6:]}',
             f'action = {self.action}',
-            f'n_action = {self.norm_action}'
+            f'n_action = {self.norm_action}',
+            f'thrusters = {self.thrusters}',
+            f'thrusters_prev = {self.thrusters_prev}',
+            f'angles = {self.angles}',
+            f'angles_prev = {self.angles_prev}',
+            f'time_step = {self.time_step}',
         ]
 
         x, y = 10, 10
@@ -691,4 +812,3 @@ class MilliampereRosEnv4Thrusters(gym.Env):
             text = font.render(obs, True, text_color)
             screen.blit(text, (x, y))
             y += 30
-

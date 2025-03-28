@@ -1,15 +1,41 @@
 #!/usr/bin/env python3
+import sys
+import os
 
-# Fix the import - use the correct capitalization
-import milliAmpere1ROS_env
+# Add gym_env to Python path if needed
+gym_env_path = "/app/gym_env"
+if gym_env_path not in sys.path:
+    sys.path.append(gym_env_path)
+
+# Try to import the environment
+try:
+    import milliAmpere1ROS_env
+    print("Successfully imported milliAmpere1ROS_env")
+except ImportError as e:
+    print(f"Error importing milliAmpere1ROS_env: {e}")
+    # Try alternative import
+    try:
+        from milliAmpere1ROS_env import envs
+        print("Imported via alternative path")
+    except ImportError as e2:
+        print(f"Alternative import also failed: {e2}")
+
 from stable_baselines3 import PPO
 import gymnasium as gym
 from datetime import datetime
 import traceback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import BaseCallback
-import os
 import numpy as np
+
+# Print all available environments for debugging
+print("\nAll available environments:")
+all_envs = [env_spec.id for env_spec in gym.envs.registry.all()]
+print(all_envs)
+
+print("\nLooking for MilliAmpere-related environments:")
+milli_envs = [env for env in all_envs if 'milli' in env.lower()]
+print(milli_envs)
 
 # Create a custom callback to save models after policy updates
 class SaveModelCallback(BaseCallback):
@@ -68,13 +94,42 @@ def main():
     Starting DRL training in clean environment ...
     """)
     
-    # Create and monitor the environment
-    # Make sure the environment ID matches exactly what's registered
-    env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v1", render_mode='human', max_time_steps=3000)
+    # Try to find the correct environment ID
+    try:
+        # First attempt with the exact name from your code
+        env_id = "MilliAmpere1ROS-v1"
+        env = gym.make(env_id, render_mode='human', max_time_steps=3000)
+        print(f"Successfully created environment: {env_id}")
+    except gym.error.NameNotFound:
+        # If that fails, try to find environment IDs containing 'milli'
+        all_envs = [env_spec.id for env_spec in gym.envs.registry.all()]
+        milli_envs = [env for env in all_envs if 'milli' in env.lower()]
+        
+        if milli_envs:
+            # Use the first matching environment
+            env_id = milli_envs[0]
+            print(f"Using alternative environment ID: {env_id}")
+            env = gym.make(env_id, render_mode='human', max_time_steps=3000)
+        else:
+            print("No MilliAmpere environments found in the registry!")
+            # Let's try to manually register the environment
+            print("Attempting to manually register the environment...")
+            try:
+                from gymnasium.envs.registration import register
+                register(
+                    id="MilliAmpere1ROS-v1",
+                    entry_point="milliAmpere1ROS_env.envs:MilliAmpere1ROSEnvV1",
+                )
+                env_id = "MilliAmpere1ROS-v1"
+                env = gym.make(env_id, render_mode='human', max_time_steps=3000)
+                print(f"Successfully registered and created environment: {env_id}")
+            except Exception as e:
+                print(f"Failed to manually register environment: {e}")
+                return
     
     log_dir = "/app/models/training_logs/"
     os.makedirs(log_dir, exist_ok=True)
-    env = Monitor(env, filename=f"{log_dir}/ppo_{env.spec.id}")
+    env = Monitor(env, filename=f"{log_dir}/ppo_{env_id}")
     
     # Setup model with explicitly defined hyperparameters
     model = PPO(

@@ -1,5 +1,10 @@
 services:
-  
+
+  base:
+    build:
+      context: .
+      dockerfile: Dockerfile.base
+    image: my-ros-base:latest  
   drl:
     build:
       context: .
@@ -7,29 +12,33 @@ services:
     container_name: drl
     hostname: drl_container
     depends_on:
+      - base
       - env_1
-      - eval_env_1
     environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
       - ROS_MASTER_URI=http://env_1:11311
-      - ROS_HOSTNAME=env_1
-      - ROS_MASTER_URIS=http://env_1:11311,http://eval_env_1:11311
-      - ROS_HOSTNAMES=env_1,eval_env_1
+      - ROS_HOSTNAME=drl
+    volumes:
+      - ${HOME}/.Xauthority:/root/.Xauthority:rw
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ../local_env/plots/drl:/app/plots
+      - ../data/models:/app/models
+      - ../data/gym_env:/app/gym_env
+      - ./drl_code:/app/drl_code
     command: >
       bash -c '
+      pip install pip --upgrade &&
+      cd /app/gym_env/milliAmpere1ROS_env && pip install -e . &&
       source /opt/ros/noetic/setup.bash &&
       roscore &
-      sleep 3 &&
-      rosrun master_discovery_fkie master_discovery _mcast_group:=224.0.0.1 &
-      rosrun master_sync_fkie master_sync &
       tail -f /dev/null
       '
-    volumes:
-      - ../local_env/plots/drl:/app/plots
-      - ./drl_code:/app/drl_code
-      - ../data/models:/app/models
-      - ../data/gym_env:/app
     networks:
       - ros_net
+    devices:
+      - /dev/dri:/dev/dri  # Required for hardware acceleration (optional)
+    init: true  # Add this line
   
   xai:
     build:
@@ -38,18 +47,22 @@ services:
     container_name: xai
     hostname: xai_contatiner
     depends_on:
+      - base
       - env_1
-      - eval_env_1
     environment:
       - ROS_MASTER_URI=http://env_1:11311
-      - ROS_HOSTNAME=env_1
-      - ROS_MASTER_URIS=http://env_1:11311,http://eval_env_1:11311
-      - ROS_HOSTNAMES=env_1,eval_env_1
+      - ROS_HOSTNAME=xai
     volumes:
       - ../local_env/plots/xai:/app/plots
       - ../data/models:/app/models
-      - ../data/gym_env:/app
+      - ../data/gym_env:/app/gym_env
       - ./xai_code:/app/xai_code
+    command: >
+      bash -c '
+      pip install pip --upgrade &&
+      cd /app/gym_env/milliAmpere1ROS_env && pip install -e . &&
+      tail -f /dev/null
+      '
     networks:
       - ros_net
 
@@ -75,54 +88,8 @@ services:
       sleep 3 &&
       source /workspace/devel/setup.bash &&
       roslaunch /workspace/src/simulator.launch &
-      rosrun master_discovery_fkie master_discovery _mcast_group:=224.0.0.1 &
-      rosrun master_sync_fkie master_sync &
       tail -f /dev/null
       "
-
-    volumes:
-    #  - "./milliAmpere1_code/workspace/src:/workspace/src:rw"  # Mount only the src directory
-      - "./milliAmpere1_code/workspace:/workspace:rw"
-      - "./milliAmpere1_code/logging:/logging:rw"
-      - "/tmp/.X11-unix:/tmp/.X11-unix:rw"
-      - "${HOME}/.Xauthority:/root/.Xauthority:rw"
-    ports:
-      - "80"
-      - "2020"
-      - "2030"
-      - "61200"
-    stdin_open: true
-    tty: true
-    networks:
-      - ros_net
-  
-  eval_env_1:
-    build: ./milliAmpere1_code
-    container_name: eval_env_1
-    hostname: eval_env_1
-    environment:
-      DISPLAY: ${DISPLAY}
-      LD_LIBRARY_PATH: "/workspace/src/ma27"
-      ROS_LANG_DISABLE: 'genlisp;gennodejs;geneus'
-      ROS_LOG_DIR: '/logging/node_logs'
-      ROS_MASTER_URI: http://eval_env_1:11311
-      ROS_HOSTNAME: eval_env_1
-      CATKIN_ENABLE_TESTING: '0'
-      QT_X11_NO_MITSHM: 1
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: all
-    command: >
-      bash -c "
-      source /opt/ros/noetic/setup.bash &&
-      roscore &
-      sleep 3 &&
-      source /workspace/devel/setup.bash &&
-      roslaunch /workspace/src/simulator.launch &
-      rosrun master_discovery_fkie master_discovery _mcast_group:=224.0.0.1 &
-      rosrun master_sync_fkie master_sync &
-      tail -f /dev/null
-      "
-
     volumes:
     #  - "./milliAmpere1_code/workspace/src:/workspace/src:rw"  # Mount only the src directory
       - "./milliAmpere1_code/workspace:/workspace:rw"

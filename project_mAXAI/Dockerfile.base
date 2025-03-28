@@ -1,0 +1,35 @@
+# BaseDockerfile
+FROM ros:noetic
+
+# Install common packages needed by both DRL and XAI
+RUN apt-get update && apt-get install -y \
+    bash \
+    python3-pip \
+    python3-venv \
+    python3-rospy \
+    python3-rosdep \
+    python3-catkin-pkg \
+    ros-noetic-std-msgs \
+    ros-noetic-message-generation \
+    ros-noetic-message-runtime \
+    libgl1-mesa-glx \
+    x11-apps \
+    fontconfig \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up the ROS workspace with common packages
+WORKDIR /root/catkin_ws/src
+COPY milliAmpere1_code/workspace/src/custom_msgs ./custom_msgs
+COPY milliAmpere1_code/workspace/src/sim_integrator ./sim_integrator
+COPY milliAmpere1_code/workspace/src/sim_milliampere ./sim_milliampere
+COPY custom_ros_msgs ./custom_ros_msgs
+
+# Build the common ROS workspace
+WORKDIR /root/catkin_ws
+RUN /bin/bash -c "source /opt/ros/noetic/setup.bash && catkin_make"
+RUN echo "source /root/catkin_ws/devel/setup.bash" >> ~/.bashrc
+
+# Create common Python environment with frequently used packages
+WORKDIR /app
+COPY ./common_requirements.txt .
+RUN pip3 install --no-cache-dir -r common_requirements.txt

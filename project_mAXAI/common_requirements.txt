@@ -1,0 +1,5 @@
+setuptools
+stable-baselines3[extra]==2.3.2
+gymnasium<0.30>=2.82
+numpy>=1.20
+scipy
