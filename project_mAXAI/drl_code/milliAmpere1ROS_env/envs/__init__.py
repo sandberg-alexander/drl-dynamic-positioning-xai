@@ -1,3 +1,4 @@
 from milliAmpere1ROS_env.envs.grid_world import GridWorldEnv
 from milliAmpere1ROS_env.envs.milliampere1_ros_v1 import MilliAmpere1RosEnvV1
 from milliAmpere1ROS_env.envs.milliampere1_ros_v2 import MilliAmpere1RosEnvV2
+from milliAmpere1ROS_env.envs.milliampere1_ros_v3 import MilliAmpere1RosEnvV3
