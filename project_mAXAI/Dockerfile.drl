@@ -22,9 +22,4 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Then copy your code
 COPY ./drl_code/ .
 
-# WORKDIR /app/gym_env
-# RUN pip install -e ./milliAmpere1ROS_env
-
-# WORKDIR /app/drl_code
-
 CMD ["tail", "-f", "/dev/null"]

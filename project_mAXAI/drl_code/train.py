@@ -13,7 +13,7 @@ import numpy as np
 
 # Create a custom callback to save models after policy updates
 class SaveModelCallback(BaseCallback):
-    def __init__(self, save_interval=1, save_path="/app/models", verbose=1):
+    def __init__(self, save_interval=1, save_path=None, verbose=1):
         """
         Parameters:
         -----------
@@ -28,7 +28,6 @@ class SaveModelCallback(BaseCallback):
         self.save_interval = save_interval
         self.save_path = save_path
         self.policy_update_count = 0
-        os.makedirs(save_path, exist_ok=True)
         
     def _on_rollout_end(self):
         """This method is called after collecting rollout data but before updating the policy"""
@@ -68,13 +67,24 @@ def main():
     Starting DRL training in clean environment ...
     """)
     
+    # Create a timestamped directory for this training run
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = f"/app/models/training_{timestamp}"
+    models_dir = f"{run_dir}/models"
+    logs_dir = f"{run_dir}/logs"
+    
+    # Create directories
+    os.makedirs(models_dir, exist_ok=True)
+    os.makedirs(logs_dir, exist_ok=True)
+    
+    print(f"Training run directory created at: {run_dir}")
+    
     # Create and monitor the environment
     # Make sure the environment ID matches exactly what's registered
-    env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v1", render_mode='human', max_time_steps=3000)
+    env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v2", render_mode='human', max_time_steps=1000)
     
-    log_dir = "/app/models/training_logs/"
-    os.makedirs(log_dir, exist_ok=True)
-    env = Monitor(env, filename=f"{log_dir}/ppo_{env.spec.id}")
+    # Monitor with logs in the run-specific directory
+    env = Monitor(env, filename=f"{logs_dir}")
     
     # Setup model with explicitly defined hyperparameters
     model = PPO(
@@ -86,8 +96,8 @@ def main():
     )
     
     # Setup callback for saving after policy updates
-    # Save every 2 policy updates
-    save_callback = SaveModelCallback(save_interval=2, save_path="/app/models")
+    # Save every 2 policy updates to the run-specific models directory
+    save_callback = SaveModelCallback(save_interval=2, save_path=models_dir)
     
     try:
         # Start training without evaluation
@@ -98,9 +108,8 @@ def main():
         print(f"An error occurred: {e}")
         traceback.print_exc()
     finally:
-        # Save final model and close environment
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        final_path = f"/app/models/FINAL_PPO_{timestamp}"
+        # Save final model to the run-specific models directory
+        final_path = f"{models_dir}/FINAL_PPO_{timestamp}"
         model.save(final_path)
         print(f"Final model saved at {final_path}")
         env.close()

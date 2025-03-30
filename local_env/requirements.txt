@@ -1,2 +1,4 @@
 ipykernel
 pygame
+pandas
+matplotlib

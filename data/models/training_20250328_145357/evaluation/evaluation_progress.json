@@ -1,0 +1,10 @@
+{
+  "completed_models": [
+    "/app/models/training_20250328_145357/models/PPO_20250330_020735_steps_499712_update_244.zip",
+    "/app/models/training_20250328_145357/models/PPO_20250330_015016_steps_495616_update_242.zip",
+    "/app/models/training_20250328_145357/models/PPO_20250330_013258_steps_491520_update_240.zip",
+    "/app/models/training_20250328_145357/models/PPO_20250330_011540_steps_487424_update_238.zip"
+  ],
+  "current_model": "/app/models/training_20250328_145357/models/PPO_20250330_005821_steps_483328_update_236.zip",
+  "completed_episodes": 2
+}
