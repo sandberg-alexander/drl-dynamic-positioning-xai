@@ -11,7 +11,7 @@ scale = 1   # Change the scale 0.7/0.4
 # Import
 #monitor_data = pd.read_csv('models/MilliampereRos4Thrusters-v0.monitor copy.csv', skiprows=1)  # Skip the first row (header)
 
-monitor_data = pd.read_csv('../data/models/training_20250328_131443/logs/monitor.csv',skiprows=1)  # Skip the first row (header)
+monitor_data = pd.read_csv('../data/models/training_20250328_145357/logs/monitor.csv',skiprows=1)  # Skip the first row (header)
 
 r = monitor_data['r']
 e = np.arange(len(r))
@@ -34,7 +34,7 @@ ax.tick_params(axis='x', labelsize=10*scale)
 ax.tick_params(axis='y', labelsize=10*scale)
 
 plt.tight_layout()
-plt.savefig('plots/drl/episode_reward/episode_plot_2_r.pdf', format='pdf', dpi=1200)
+plt.savefig('plots/drl/episode_reward/episode_plot_1_r.pdf', format='pdf', dpi=1200)
 plt.close(fig)
 
 
@@ -49,7 +49,7 @@ ax.tick_params(axis='x', labelsize=10*scale)
 ax.tick_params(axis='y', labelsize=10*scale)
 
 plt.tight_layout()
-plt.savefig('plots/drl/episode_reward/episode_plot_2_r2.pdf', format='pdf', dpi=1200)
+plt.savefig('plots/drl/episode_reward/episode_plot_1_r2.pdf', format='pdf', dpi=1200)
 plt.close(fig)
 
 # Plot
@@ -65,5 +65,5 @@ ax.tick_params(axis='x', labelsize=10*scale)
 ax.tick_params(axis='y', labelsize=10*scale)
 
 plt.tight_layout()
-plt.savefig('plots/drl/episode_reward/episode_plot_2_l.pdf', format='pdf', dpi=1200)
+plt.savefig('plots/drl/episode_reward/episode_plot_1_l.pdf', format='pdf', dpi=1200)
 plt.close(fig)

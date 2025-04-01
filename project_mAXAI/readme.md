@@ -43,3 +43,4 @@ WORKDIR /workspace
 RUN /bin/bash -c "source devel/setup.bash" 
 # && roslaunch src/simulator.launch && rosservice call /supervisor/switch_mode "mode: 'direct_actuator_control'" "
 
+rosservice call /sim_vessel/reset_state 334.61 990.24 0 0 0 0 0 0 0 0 0 0 0 0 && rostopic pub /actuator_ref_1 custom_msgs/ActuatorSetpoints "{throttle_reference: 0, angle_reference: 135}" && rostopic pub /actuator_ref_2 custom_msgs/ActuatorSetpoints "{throttle_reference: 0, angle_reference: -135}" && rostopic pub /actuator_ref_3 custom_msgs/ActuatorSetpoints "{throttle_reference: 0, angle_reference: -45}" && rostopic pub /actuator_ref_4 custom_msgs/ActuatorSetpoints "{throttle_reference: 0, angle_reference: 45}" && rosservice call /sim_vessel/reset_state 334.61 990.24 0 0 0 0 0 0 0 0 0 0 0 0

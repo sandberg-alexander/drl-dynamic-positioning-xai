@@ -5,6 +5,7 @@ services:
       context: .
       dockerfile: Dockerfile.base
     image: my-ros-base:latest  
+
   drl:
     build:
       context: .
@@ -13,11 +14,11 @@ services:
     hostname: drl_container
     depends_on:
       - base
-      - env_1
+      - simulator
     environment:
       - DISPLAY=${DISPLAY}
       - QT_X11_NO_MITSHM=1
-      - ROS_MASTER_URI=http://env_1:11311
+      - ROS_MASTER_URI=http://simulator:11311
       - ROS_HOSTNAME=drl
     volumes:
       - ${HOME}/.Xauthority:/root/.Xauthority:rw
@@ -31,7 +32,6 @@ services:
       pip install pip --upgrade &&
       cd /app/gym_env/milliAmpere1ROS_env && pip install -e . &&
       source /opt/ros/noetic/setup.bash &&
-      roscore &
       tail -f /dev/null
       '
     networks:
@@ -48,9 +48,9 @@ services:
     hostname: xai_contatiner
     depends_on:
       - base
-      - env_1
+      - simulator
     environment:
-      - ROS_MASTER_URI=http://env_1:11311
+      - ROS_MASTER_URI=http://simulator:11311
       - ROS_HOSTNAME=xai
     volumes:
       - ../local_env/plots/xai:/app/plots
@@ -66,17 +66,17 @@ services:
     networks:
       - ros_net
 
-  env_1:
+  simulator:
     build: ./milliAmpere1_code
-    container_name: env_1
-    hostname: env_1
+    container_name: simulator
+    hostname: simulator_container
     environment:
       DISPLAY: ${DISPLAY}
       LD_LIBRARY_PATH: "/workspace/src/ma27"
       ROS_LANG_DISABLE: 'genlisp;gennodejs;geneus'
       ROS_LOG_DIR: '/logging/node_logs'
-      ROS_MASTER_URI: http://env_1:11311
-      ROS_HOSTNAME: env_1
+      ROS_MASTER_URI: http://simulator:11311
+      ROS_HOSTNAME: simulator
       CATKIN_ENABLE_TESTING: '0'
       QT_X11_NO_MITSHM: 1
       NVIDIA_VISIBLE_DEVICES: all
@@ -91,7 +91,6 @@ services:
       tail -f /dev/null
       "
     volumes:
-    #  - "./milliAmpere1_code/workspace/src:/workspace/src:rw"  # Mount only the src directory
       - "./milliAmpere1_code/workspace:/workspace:rw"
       - "./milliAmpere1_code/logging:/logging:rw"
       - "/tmp/.X11-unix:/tmp/.X11-unix:rw"
@@ -100,7 +99,7 @@ services:
       - "80"
       - "2020"
       - "2030"
-      - "61200"
+      - "61200:61200"
     stdin_open: true
     tty: true
     networks:

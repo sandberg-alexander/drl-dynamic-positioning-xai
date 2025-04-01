@@ -94,7 +94,7 @@ def plot_evaluation_rewards(run_dir, output_file='plots/drl/eval/evaluation_rewa
     # Handle multiple best models if they have the same mean reward
     best_model_steps = steps_array[best_model_indices]
 
-    fig, ax = plt.subplots(figsize=(12, 6)) # Adjust figure size as needed
+    fig, ax = plt.subplots() # Adjust figure size as needed
 
     # Plot bars for mean rewards
     ax.bar(steps_array, mean_rewards_array, color=colors, width=np.min(np.diff(steps_array))*0.8 if len(steps_array)>1 else 10000) # Adjust bar width
@@ -103,16 +103,16 @@ def plot_evaluation_rewards(run_dir, output_file='plots/drl/eval/evaluation_rewa
     ax.plot(best_model_steps, mean_rewards_array[best_model_indices], '*', markersize=12, color='purple', label=f"Best Mean Reward ({best_mean_reward:.2f})")
 
     # Optional: Add a line for maximum possible reward if known (e.g., 1000 from your example)
-    # max_possible_reward = 1000
-    # ax.axhline(y=max_possible_reward, color='black', linestyle='--', label=f"Target/Max Reward ({max_possible_reward})")
+    max_possible_reward = 1000
+    ax.axhline(y=max_possible_reward, color='black', linestyle='--', label=f"Target/Max Reward ({max_possible_reward})")
 
     ax.set_xlabel('Training Steps', fontsize=14*scale)
     ax.set_ylabel('Mean Evaluation Reward', fontsize=14*scale)
-    ax.set_title(f'Mean Evaluation Reward vs Training Steps\n(Run: {os.path.basename(run_dir)})', fontsize=16*scale)
-    ax.tick_params(axis='x', labelsize=10*scale, rotation=45) # Rotate labels if needed
+    #ax.set_title(f'Mean Evaluation Reward vs Training Steps\n(Run: {os.path.basename(run_dir)})', fontsize=16*scale)
+    ax.tick_params(axis='x', labelsize=10*scale) # Rotate labels if needed
     ax.tick_params(axis='y', labelsize=10*scale)
     ax.legend(fontsize=10*scale)
-    ax.grid(axis='y', linestyle='--') # Add grid lines for better readability
+    #ax.grid(axis='y', linestyle='--') # Add grid lines for better readability
 
     plt.tight_layout()
 
@@ -136,7 +136,7 @@ if __name__ == "__main__":
     # Make run_dir argument mandatory
     parser.add_argument('--dir', dest='run_dir', type=str, required=True,
                         help='Path to the main training run directory (e.g., ../data/models/training_20250328_145357)')
-    parser.add_argument('--output', dest='output_file', type=str, default='plots/drl/eval/evaluation_rewards_1_r.pdf',
+    parser.add_argument('--output', dest='output_file', type=str, default='plots/drl/eval/evaluation_rewards_2_r.pdf',
                         help='Output filename for the plot (e.g., evaluation_rewards.pdf)')
 
     args = parser.parse_args()

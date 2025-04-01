@@ -1,0 +1,9 @@
+training_20250328_131443
+    trained in MilliAmpere1ROS-v3
+    trained on uni pc
+    trained with no reset service
+
+training_20250328_145357
+    trained in MilliAmpere1ROS-v2
+    trained on laptop
+    trained with reset service

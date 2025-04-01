@@ -175,6 +175,8 @@ class MilliAmpere1RosEnvV3(gym.Env):
 
     def step(self, action):
         # Updating variables after new timestep
+        if self.time_step % 10 == 0:
+            self.target_pose += np.array([1,0,0])
         self.time_step += 1
         self.eta_obs_prev = self.eta_obs.copy()
         self.action_prev = self.action.copy()
