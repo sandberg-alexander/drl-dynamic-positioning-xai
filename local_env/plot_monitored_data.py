@@ -11,7 +11,7 @@ scale = 1   # Change the scale 0.7/0.4
 # Import
 #monitor_data = pd.read_csv('models/MilliampereRos4Thrusters-v0.monitor copy.csv', skiprows=1)  # Skip the first row (header)
 
-monitor_data = pd.read_csv('../data/models/training_20250328_145357/logs/monitor.csv',skiprows=1)  # Skip the first row (header)
+monitor_data = pd.read_csv('../data/models/training_20250328_131443/logs/monitor.csv',skiprows=1)  # Skip the first row (header)
 
 r = monitor_data['r']
 e = np.arange(len(r))
