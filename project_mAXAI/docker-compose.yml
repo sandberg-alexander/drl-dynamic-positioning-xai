@@ -1,11 +1,9 @@
 services:
-
   base:
     build:
       context: .
       dockerfile: Dockerfile.base
-    image: my-ros-base:latest  
-
+    image: my-ros-base:latest
   drl:
     build:
       context: .
@@ -13,33 +11,29 @@ services:
     container_name: drl
     hostname: drl_container
     depends_on:
-      - base
-      - simulator
+    - base
+    - simulator
     environment:
-      - DISPLAY=${DISPLAY}
-      - QT_X11_NO_MITSHM=1
-      - ROS_MASTER_URI=http://simulator:11311
-      - ROS_HOSTNAME=drl
+    - DISPLAY=${DISPLAY}
+    - QT_X11_NO_MITSHM=1
+    - ROS_MASTER_URI=http://simulator:11311
+    - ROS_HOSTNAME=drl
     volumes:
-      - ${HOME}/.Xauthority:/root/.Xauthority:rw
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - ../local_env/plots/drl:/app/plots
-      - ../data/models:/app/models
-      - ../data/gym_env:/app/gym_env
-      - ./drl_code:/app/drl_code
-    command: >
-      bash -c '
-      pip install pip --upgrade &&
-      cd /app/gym_env/milliAmpere1ROS_env && pip install -e . &&
-      source /opt/ros/noetic/setup.bash &&
-      tail -f /dev/null
+    - ${HOME}/.Xauthority:/root/.Xauthority:rw
+    - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    - ../local_env/plots/drl:/app/plots
+    - ../data/models:/app/models
+    - ../data/gym_env:/app/gym_env
+    - ./drl_code:/app/drl_code
+    command: 'bash -c '' rm -rf /app/drl_code/milliAmpere1ROS_env &&  cp -r /app/gym_env/milliAmpere1ROS_env
+      /app/drl_code/ &&  source /opt/ros/noetic/setup.bash &&  tail -f /dev/null ''
+
       '
     networks:
-      - ros_net
+    - ros_net
     devices:
-      - /dev/dri:/dev/dri  # Required for hardware acceleration (optional)
-    init: true  # Add this line
-  
+    - /dev/dri:/dev/dri
+    init: true
   xai:
     build:
       context: .
@@ -47,64 +41,63 @@ services:
     container_name: xai
     hostname: xai_contatiner
     depends_on:
-      - base
-      - simulator
+    - base
+    - simulator
     environment:
-      - ROS_MASTER_URI=http://simulator:11311
-      - ROS_HOSTNAME=xai
+    - DISPLAY=${DISPLAY}
+    - QT_X11_NO_MITSHM=1
+    - ROS_MASTER_URI=http://simulator:11311
+    - ROS_HOSTNAME=xai
     volumes:
-      - ../local_env/plots/xai:/app/plots
-      - ../data/models:/app/models
-      - ../data/gym_env:/app/gym_env
-      - ./xai_code:/app/xai_code
-    command: >
-      bash -c '
-      pip install pip --upgrade &&
-      cd /app/gym_env/milliAmpere1ROS_env && pip install -e . &&
-      tail -f /dev/null
+    - ${HOME}/.Xauthority:/root/.Xauthority:rw
+    - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    - ../local_env/plots/xai:/app/plots
+    - ../data/models:/app/models
+    - ../data/gym_env:/app/gym_env
+    - ./xai_code:/app/xai_code
+    command: 'bash -c '' rm -rf /app/xai_code/milliAmpere1ROS_env &&  cp -r /app/gym_env/milliAmpere1ROS_env
+      /app/xai_code/ &&  source /opt/ros/noetic/setup.bash &&  tail -f /dev/null ''
+
       '
     networks:
-      - ros_net
-
+    - ros_net
+    devices:
+    - /dev/dri:/dev/dri
+    init: true
   simulator:
     build: ./milliAmpere1_code
     container_name: simulator
     hostname: simulator_container
     environment:
       DISPLAY: ${DISPLAY}
-      LD_LIBRARY_PATH: "/workspace/src/ma27"
-      ROS_LANG_DISABLE: 'genlisp;gennodejs;geneus'
-      ROS_LOG_DIR: '/logging/node_logs'
+      LD_LIBRARY_PATH: /workspace/src/ma27
+      ROS_LANG_DISABLE: genlisp;gennodejs;geneus
+      ROS_LOG_DIR: /logging/node_logs
       ROS_MASTER_URI: http://simulator:11311
       ROS_HOSTNAME: simulator
       CATKIN_ENABLE_TESTING: '0'
       QT_X11_NO_MITSHM: 1
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: all
-    command: >
-      bash -c "
-      source /opt/ros/noetic/setup.bash &&
-      roscore &
-      sleep 3 &&
-      source /workspace/devel/setup.bash &&
-      roslaunch /workspace/src/simulator.launch &
-      tail -f /dev/null
-      "
+    command: 'bash -c " source /opt/ros/noetic/setup.bash && roscore & sleep 3 &&
+      source /workspace/devel/setup.bash && roslaunch /workspace/src/simulator.launch
+      & tail -f /dev/null "
+
+      '
     volumes:
-      - "./milliAmpere1_code/workspace:/workspace:rw"
-      - "./milliAmpere1_code/logging:/logging:rw"
-      - "/tmp/.X11-unix:/tmp/.X11-unix:rw"
-      - "${HOME}/.Xauthority:/root/.Xauthority:rw"
+    - ./milliAmpere1_code/workspace:/workspace:rw
+    - ./milliAmpere1_code/logging:/logging:rw
+    - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    - ${HOME}/.Xauthority:/root/.Xauthority:rw
     ports:
-      - "80"
-      - "2020"
-      - "2030"
-      - "61200:61200"
+    - '80'
+    - '2020'
+    - '2030'
+    - 61200:61200
     stdin_open: true
     tty: true
     networks:
-      - ros_net
-  
+    - ros_net
 networks:
   ros_net:
     driver: bridge

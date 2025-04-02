@@ -1,0 +1,12 @@
+milliampere_ros_v1.py
+    decomposed vector action space without reset service
+
+milliampere_ros_v2.py
+    decomposed vector action space with reset service and termination penelty
+
+milliampere_ros_v3_old.py
+    decomposed vector action space without reset service and with termination penelty
+
+milliampere_ros_v3_old.py
+    decomposed vector action space without reset service and with termination penelty
+    and has moving target

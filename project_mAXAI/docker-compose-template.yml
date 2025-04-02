@@ -1,5 +1,11 @@
 services:
-  
+
+  base:
+    build:
+      context: .
+      dockerfile: Dockerfile.base
+    image: my-ros-base:latest  
+
   drl:
     build:
       context: .
@@ -7,28 +13,32 @@ services:
     container_name: drl
     hostname: drl_container
     depends_on:
-PLACEHOLDER_DEPENDENCIES
+      - base
+      - SERVICE_PLACEHOLDER
     environment:
-      - ROS_MASTER_URI=http://env_1:11311
-      - ROS_HOSTNAME=env_1
-      - ROS_MASTER_URIS=PLACEHOLDER_URIS
-      - ROS_HOSTNAMES=PLACEHOLDER_HOSTNAMES
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - ROS_MASTER_URI=http://SERVICE_PLACEHOLDER:11311
+      - ROS_HOSTNAME=drl
+    volumes:
+      - ${HOME}/.Xauthority:/root/.Xauthority:rw
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ../local_env/plots/drl:/app/plots
+      - ../data/models:/app/models
+      - ../data/gym_env:/app/gym_env
+      - ./drl_code:/app/drl_code
     command: >
       bash -c '
-      source /opt/ros/noetic/setup.bash &&
-      roscore &
-      sleep 3 &&
-      rosrun master_discovery_fkie master_discovery _mcast_group:=224.0.0.1 &
-      rosrun master_sync_fkie master_sync &
+      rm -rf /app/drl_code/milliAmpere1ROS_env && 
+      cp -r /app/gym_env/milliAmpere1ROS_env /app/drl_code/ && 
+      source /opt/ros/noetic/setup.bash && 
       tail -f /dev/null
       '
-    volumes:
-      - ../local_env/plots/drl:/app/plots
-      - ./drl_code:/app/drl_code
-      - ../data/models:/app/models
-      - ../data/gym_env:/app
     networks:
       - ros_net
+    devices:
+      - /dev/dri:/dev/dri  # Required for hardware acceleration (optional)
+    init: true  # Add this line
   
   xai:
     build:
@@ -37,33 +47,44 @@ PLACEHOLDER_DEPENDENCIES
     container_name: xai
     hostname: xai_contatiner
     depends_on:
-PLACEHOLDER_DEPENDENCIES
+      - base
+      - SERVICE_PLACEHOLDER
     environment:
-      - ROS_MASTER_URI=http://env_1:11311
-      - ROS_HOSTNAME=env_1
-      - ROS_MASTER_URIS=PLACEHOLDER_URIS
-      - ROS_HOSTNAMES=PLACEHOLDER_HOSTNAMES
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - ROS_MASTER_URI=http://SERVICE_PLACEHOLDER:11311
+      - ROS_HOSTNAME=xai
     volumes:
+      - ${HOME}/.Xauthority:/root/.Xauthority:rw
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ../local_env/plots/xai:/app/plots
       - ../data/models:/app/models
-      - ../data/gym_env:/app
+      - ../data/gym_env:/app/gym_env
       - ./xai_code:/app/xai_code
+    command: >
+      bash -c '
+      rm -rf /app/xai_code/milliAmpere1ROS_env && 
+      cp -r /app/gym_env/milliAmpere1ROS_env /app/xai_code/ && 
+      source /opt/ros/noetic/setup.bash && 
+      tail -f /dev/null
+      '
     networks:
       - ros_net
+    devices:
+      - /dev/dri:/dev/dri  # Required for hardware acceleration (optional)
+    init: true  # Add this line
 
-  ##########################################################################
-  #BEGIN_ENV_BLOCK
-  ENV_NAME_PLACEHOLDER:
+  simulator:
     build: ./milliAmpere1_code
-    container_name: ENV_NAME_PLACEHOLDER
-    hostname: ENV_NAME_PLACEHOLDER
+    container_name: simulator
+    hostname: simulator_container
     environment:
       DISPLAY: ${DISPLAY}
       LD_LIBRARY_PATH: "/workspace/src/ma27"
       ROS_LANG_DISABLE: 'genlisp;gennodejs;geneus'
       ROS_LOG_DIR: '/logging/node_logs'
-      ROS_MASTER_URI: ENV_URI_PLACEHOLDER
-      ROS_HOSTNAME: ENV_NAME_PLACEHOLDER
+      ROS_MASTER_URI: http://simulator:11311
+      ROS_HOSTNAME: simulator
       CATKIN_ENABLE_TESTING: '0'
       QT_X11_NO_MITSHM: 1
       NVIDIA_VISIBLE_DEVICES: all
@@ -72,17 +93,13 @@ PLACEHOLDER_DEPENDENCIES
       bash -c "
       source /opt/ros/noetic/setup.bash &&
       roscore &
-      sleep 3
-      source /root/workspace/devel/setup.bash &&
-      roslaunch /root/workspace/src/simulator.launch &
-      rosrun master_discovery_fkie master_discovery _mcast_group:=224.0.0.1 &
-      rosrun master_sync_fkie master_sync &
+      sleep 3 &&
+      source /workspace/devel/setup.bash &&
+      roslaunch /workspace/src/simulator.launch &
       tail -f /dev/null
       "
-
     volumes:
-    #  - "./milliAmpere1_code/workspace/src:/workspace/src:rw"  # Mount only the src directory
-      - "./milliAmpere1_code/workspace:/root/workspace:rw"
+      - "./milliAmpere1_code/workspace:/workspace:rw"
       - "./milliAmpere1_code/logging:/logging:rw"
       - "/tmp/.X11-unix:/tmp/.X11-unix:rw"
       - "${HOME}/.Xauthority:/root/.Xauthority:rw"
@@ -90,14 +107,60 @@ PLACEHOLDER_DEPENDENCIES
       - "80"
       - "2020"
       - "2030"
-      - "61200"
+      - "61200:61200"
     stdin_open: true
     tty: true
     networks:
       - ros_net
-  #END_ENV_BLOCK
-  ##########################################################################
 
+  real_vessel:
+    build: 
+      context: ./milliAmpere1_code
+      args:
+        USERNAME: ma
+        USER_UID: 1000
+        USER_GID: 1000
+      dockerfile: Dockerfile
+    container_name: real_vessel
+    hostname: real_vessel_container
+    environment:
+      DISPLAY: ${DISPLAY}
+      LD_LIBRARY_PATH: "/workspace/src/ma27"
+      ROS_LANG_DISABLE: 'genlisp;genjava;gennodejs;geneus'
+      ROS_LOG_DIR: /logging/node_logs
+      ROS_MASTER_URI: http://real_vessel:11311
+      ROS_HOSTNAME: real_vessel
+      XAUTHORITY: '/tmp/.docker.xauth'
+      PYTHONDONTWRITEBYTECODE: 1
+      CATKIN_ENABLE_TESTING: 0
+      QT_X11_NO_MITSHM: 1
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
+    volumes:
+      - "./milliAmpere1_code/workspace:/workspace:rw"
+      - "./milliAmpere1_code/logging:/logging:rw"
+      - "/tmp/.X11-unix:/tmp/.X11-unix:rw"
+      - "${HOME}/.Xauthority:/root/.Xauthority:rw"
+      - "/home/${USER}:/home/${USER}:rw"
+      - "/tmp/.docker.xauth:/tmp/.docker.xauth"
+    devices:
+      - "/dev/arduino_RC:/dev/arduino_RC"
+      - "/dev/xSens:/dev/xSens"
+      - "/dev/vector_vs330:/dev/vector_vs330"
+      - "/dev/ttyUSB0:/dev/ttyUSB0"   #IMU
+      #- "/dev/ttyACM0:/dev/ttyACM0"   #Arduino (RM)
+      - "/dev/ttyS0:/dev/ttyS0"       # GPS
+      - "/dev/ttyS1:/dev/ttyS1"       # GPS
+      - "/dev/ttyS2:/dev/ttyS2"       # GPS
+      - "/dev/ttyS3:/dev/ttyS3"       # GPS
+      - "/dev/ttyS4:/dev/ttyS4"       # GPS
+    stdin_open: true
+    tty: true
+    networks:
+      - ros_net
+    cap_add:
+      - NET_ADMIN
+  
 networks:
   ros_net:
     driver: bridge

@@ -66,8 +66,8 @@ class MilliAmpere1RosEnvV3(gym.Env):
 
         self.obs_time = None
         self.obs_time_prev = None
-        self.eta_obs = np.zeros(3)
-        self.eta_obs_prev = np.zeros(3)
+        self.eta_obs = np.array([self.north, self.east, 0]) #np.zeros(3)
+        self.eta_obs_prev = self.eta_obs.copy() #np.zeros(3)
         self.epsilon_obs = None
         self.epsilon = np.zeros(3)
         self.est_nu_obs = None
@@ -175,6 +175,8 @@ class MilliAmpere1RosEnvV3(gym.Env):
 
     def step(self, action):
         # Updating variables after new timestep
+        if self.time_step % 10 == 0:
+            self.target_pose += np.array([1,0,0])
         self.time_step += 1
         self.eta_obs_prev = self.eta_obs.copy()
         self.action_prev = self.action.copy()
@@ -337,7 +339,11 @@ class MilliAmpere1RosEnvV3(gym.Env):
     def _get_info(self):
         return {
             "observation": self.observation,
-            "target_pose": self.target_pose
+            "target_pose": self.target_pose,
+            "thrusters": self.thrusters_prev,
+            "angles": self.angles_prev,
+            "actual_angles": self.actual_angles*180/np.pi
+
         }       ###### PUT MORE INFO!!!
     
     def _is_terminated(self):

@@ -12,8 +12,9 @@ import math
 
 from geometry_msgs.msg import PoseStamped
 from custom_msgs.msg import ActuatorSetpoints
+from sim_milliampere.srv import ResetState
 
-class MilliAmpere1RosEnvV3(gym.Env):
+class MilliAmpere1RosEnvV2(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 4}
 
     def __init__(self, max_time_steps=3000, render_mode=None):
@@ -28,6 +29,9 @@ class MilliAmpere1RosEnvV3(gym.Env):
         self.pub_act_ref_3 = rospy.Publisher('/actuator_ref_3', ActuatorSetpoints, queue_size=1)
         self.pub_act_ref_4 = rospy.Publisher('/actuator_ref_4', ActuatorSetpoints, queue_size=1)
         rospy.Subscriber('/navigation/pose', PoseStamped, self._pose_callback)
+
+        # ROS services
+        self.reset_service = rospy.ServiceProxy('/sim_vessel/reset_state', ResetState)
 
         # ROS shutdown
         rospy.on_shutdown(self.close)
@@ -63,27 +67,6 @@ class MilliAmpere1RosEnvV3(gym.Env):
         self.episode_counter = 0
         self.north = 334.61                 # offset from NED origo in meters
         self.east = 990.24                  # offset from NED origo in meters
-
-        self.obs_time = None
-        self.obs_time_prev = None
-        self.eta_obs = np.zeros(3)
-        self.eta_obs_prev = np.zeros(3)
-        self.epsilon_obs = None
-        self.epsilon = np.zeros(3)
-        self.est_nu_obs = None
-        self.est_nu = np.zeros(3)
-        self.observation = None
-        self.norm_observation = None
-        self.action = np.zeros(8)
-        self.action_prev = np.zeros(8)
-        self.norm_action = np.zeros(8)
-        self.norm_action_prev = np.zeros(8)
-        self.real_azimuth_angle = 0.0
-        self.thrusters = np.zeros(4)
-        self.thrusters_prev = np.zeros(4)
-        self.angles = np.array([135, -135, -45, 45])
-        self.angles_prev = np.array([135, -135, -45, 45])
-        self.actual_angles = np.zeros(4)
 
         # Reward weights and variance
         self.w_gauss            = 1.0
@@ -141,6 +124,35 @@ class MilliAmpere1RosEnvV3(gym.Env):
             self.clock = pygame.time.Clock()
     
     ######################################
+    ########## init functions ############
+    
+    def _init_episode_var(self):
+        self.time_step = 0
+        self.target_pose = self.np_random.uniform(-1,1,3) * self.target_bounds + np.array([self.north, self.east, 0])
+        self.obs_time = None
+        self.obs_time_prev = None
+        self.eta_obs = np.zeros(3)
+        self.eta_obs_prev = np.zeros(3)
+        self.epsilon_obs = None
+        self.epsilon = np.zeros(3)
+        self.est_nu_obs = None
+        self.est_nu = np.zeros(3)
+        self.observation = None
+        self.norm_observation = None
+        self.action = np.zeros(8)
+        self.action_prev = np.zeros(8)
+        self.norm_action = np.zeros(8)
+        self.norm_action_prev = np.zeros(8)
+        self.real_azimuth_angle = 0.0
+        self.thrusters = np.zeros(4)
+        self.thrusters_prev = np.zeros(4)
+        self.angles = np.array([135, -135, -45, 45])
+        self.angles_prev = np.array([135, -135, -45, 45])
+        self.actual_angles = np.zeros(4)
+        self.terminated_flag = False
+
+
+    ######################################
     ######## callback functions ##########
 
     def _pose_callback(self, data):
@@ -156,14 +168,28 @@ class MilliAmpere1RosEnvV3(gym.Env):
         print(f"Episode: {self.episode_counter}")
 
         # Init episode variables
-        self.time_step = 0
-        self.terminated_flag = False
-        self.target_pose = self.np_random.uniform(-1,1,3) * self.target_bounds + np.array([self.eta_obs[0], self.eta_obs[1], 0])
+        self._init_episode_var()
         print(f"New target at {self.target_pose}")
 
         # Init actuators
         self._calculate_actuator_inputs(self.norm_action)
         self._pub_actuator_inputs()
+
+        rospy.wait_for_service('/sim_vessel/reset_state')
+        try:
+            self.reset_service(self.north, self.east, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        except rospy.ServiceException as e:
+            print(f"Service call failed: {e}")
+
+        # Sleep to collect observations from ROS node
+        rospy.sleep(self.sleep_time*30)                    ##### SHOULD I REMOVE?
+
+                # Init episode enviorment
+        rospy.wait_for_service('/sim_vessel/reset_state')
+        try:
+            self.reset_service(self.north, self.east, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        except rospy.ServiceException as e:
+            print(f"Service call failed: {e}")
 
         observation = self._get_obs()
         normalized_observation = self._get_norm_obs(observation)
@@ -337,10 +363,7 @@ class MilliAmpere1RosEnvV3(gym.Env):
     def _get_info(self):
         return {
             "observation": self.observation,
-            "target_pose": self.target_pose,
-            "thrusters": self.thrusters_prev,
-            "angles": self.angles_prev,
-            "actual_angles": self.actual_angles*180/np.pi
+            "target_pose": self.target_pose
         }       ###### PUT MORE INFO!!!
     
     def _is_terminated(self):
@@ -351,7 +374,7 @@ class MilliAmpere1RosEnvV3(gym.Env):
             print(f"Episode ended due to t-ERM-ination at epsilon_d = {epsilon_d}")
             self.terminated_flag = True
             return True
-
+        
         else:
             return False
         
@@ -416,12 +439,13 @@ class MilliAmpere1RosEnvV3(gym.Env):
         #     est_dot_alpha = (alpha-alpha_prev)/self.delta_t_action
             
         #     R_act -= self.w_abs_n * abs(n) - self.w_est_dot_n * abs(est_dot_n) - self.w_est_dot_alpha * abs(est_dot_alpha)
+        
         if self.terminated_flag:
-            self.R_termination = -100
+            self.R_terminated = -100
         else:
-            self.R_termination = 0
-            
-        reward = np.squeeze(self.R_gauss + self.R_AS_gauss)/1.4 + self.R_vel + self.R_thrust + self.R_thrust_d + self.R_constraint + self.R_termination# + R_act
+            self.R_terminated = 0
+
+        reward = np.squeeze(self.R_gauss + self.R_AS_gauss)/1.4 + self.R_vel + self.R_thrust + self.R_thrust_d + self.R_constraint + self.R_terminated # + R_act
         
         return reward
 
@@ -815,6 +839,7 @@ class MilliAmpere1RosEnvV3(gym.Env):
             f'thrusters_prev = {self.thrusters_prev}',
             f'angles = {self.angles}',
             f'angles_prev = {self.angles_prev}',
+            f'actual_angles = {self.actual_angles/np.pi*180}',
             f'time_step = {self.time_step}',
         ]
 

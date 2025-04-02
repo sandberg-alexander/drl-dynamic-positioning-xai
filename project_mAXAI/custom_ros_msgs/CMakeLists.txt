@@ -8,8 +8,9 @@ find_package(catkin REQUIRED COMPONENTS
 
 add_message_files(
   FILES
-  Observation.msg
   Action.msg
+  Observation.msg
+  ObservationActuatorRefPair.msg
 )
 
 generate_messages(
