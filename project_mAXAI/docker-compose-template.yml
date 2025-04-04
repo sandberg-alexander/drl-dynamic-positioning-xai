@@ -1,10 +1,11 @@
+# docker-compose-template.yml (For Laptop Generation)
 services:
 
   base:
     build:
       context: .
       dockerfile: Dockerfile.base
-    image: my-ros-base:latest  
+    image: my-ros-base:latest
 
   drl:
     build:
@@ -14,90 +15,97 @@ services:
     hostname: drl_container
     depends_on:
       - base
-      - SERVICE_PLACEHOLDER
+      # DEPENDENCY_PLACEHOLDER # - simulator_local (for local mode)
     environment:
       - DISPLAY=${DISPLAY}
       - QT_X11_NO_MITSHM=1
-      - ROS_MASTER_URI=http://SERVICE_PLACEHOLDER:11311
-      - ROS_HOSTNAME=drl
+      - ROS_MASTER_URI=ROS_MASTER_URI_PLACEHOLDER # e.g., http://simulator_local:11311 or http://<remote_ip>:11311
+      - ROS_IP=ROS_IP_PLACEHOLDER                 # e.g., removed or <local_ip>
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
     volumes:
       - ${HOME}/.Xauthority:/root/.Xauthority:rw
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - ../local_env/plots/drl:/app/plots
-      - ../data/models:/app/models
-      - ../data/gym_env:/app/gym_env
-      - ./drl_code:/app/drl_code
+      - ../local_env/plots/drl:/app/plots:rw
+      - ../data/models:/app/models:rw
+      - ../data/gym_env:/app/gym_env:rw
+      - ../data/samples:/app/samples:rw
+      - ./drl_code:/app/drl_code:rw
     command: >
       bash -c '
-      rm -rf /app/drl_code/milliAmpere1ROS_env && 
-      cp -r /app/gym_env/milliAmpere1ROS_env /app/drl_code/ && 
-      source /opt/ros/noetic/setup.bash && 
+      rm -rf /app/drl_code/milliAmpere1ROS_env &&
+      cp -r /app/gym_env/milliAmpere1ROS_env /app/drl_code/ &&
+      source /opt/ros/noetic/setup.bash &&
       tail -f /dev/null
       '
-    networks:
-      - ros_net
+    # NETWORK_PLACEHOLDER # networks: [- ros_local_net] (for local mode)
+    network_mode: host
     devices:
-      - /dev/dri:/dev/dri  # Required for hardware acceleration (optional)
-    init: true  # Add this line
-  
+      - /dev/dri:/dev/dri
+    init: true
+
   xai:
     build:
       context: .
       dockerfile: Dockerfile.xai
     container_name: xai
-    hostname: xai_contatiner
+    hostname: xai_container
     depends_on:
       - base
-      - SERVICE_PLACEHOLDER
+      # DEPENDENCY_PLACEHOLDER # - simulator_local (for local mode)
     environment:
       - DISPLAY=${DISPLAY}
       - QT_X11_NO_MITSHM=1
-      - ROS_MASTER_URI=http://SERVICE_PLACEHOLDER:11311
-      - ROS_HOSTNAME=xai
+      - ROS_MASTER_URI=ROS_MASTER_URI_PLACEHOLDER # e.g., http://simulator_local:11311 or http://<remote_ip>:11311
+      - ROS_IP=ROS_IP_PLACEHOLDER                 # e.g., removed or <local_ip>
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
     volumes:
       - ${HOME}/.Xauthority:/root/.Xauthority:rw
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - ../local_env/plots/xai:/app/plots
-      - ../data/models:/app/models
-      - ../data/gym_env:/app/gym_env
-      - ./xai_code:/app/xai_code
+      - ../local_env/plots/xai:/app/plots:rw
+      - ../data/models:/app/models:rw
+      - ../data/gym_env:/app/gym_env:rw
+      - ../data/samples:/app/samples:rw
+      - ./xai_code:/app/xai_code:rw
     command: >
       bash -c '
-      rm -rf /app/xai_code/milliAmpere1ROS_env && 
-      cp -r /app/gym_env/milliAmpere1ROS_env /app/xai_code/ && 
-      source /opt/ros/noetic/setup.bash && 
+      rm -rf /app/xai_code/milliAmpere1ROS_env &&
+      cp -r /app/gym_env/milliAmpere1ROS_env /app/xai_code/ &&
+      source /opt/ros/noetic/setup.bash &&
       tail -f /dev/null
       '
-    networks:
-      - ros_net
+    # NETWORK_PLACEHOLDER # networks: [- ros_local_net] (for local mode)
+    network_mode: host
     devices:
-      - /dev/dri:/dev/dri  # Required for hardware acceleration (optional)
-    init: true  # Add this line
+      - /dev/dri:/dev/dri
+    init: true
 
-  simulator:
+  # --- Definition for LOCAL simulator ---
+  # This whole service will be REMOVED by the script for remote mode
+  simulator_local:
     build: ./milliAmpere1_code
-    container_name: simulator
-    hostname: simulator_container
+    container_name: simulator_local
+    hostname: simulator_local_container
     environment:
-      DISPLAY: ${DISPLAY}
-      LD_LIBRARY_PATH: "/workspace/src/ma27"
-      ROS_LANG_DISABLE: 'genlisp;gennodejs;geneus'
-      ROS_LOG_DIR: '/logging/node_logs'
-      ROS_MASTER_URI: http://simulator:11311
-      ROS_HOSTNAME: simulator
-      CATKIN_ENABLE_TESTING: '0'
-      QT_X11_NO_MITSHM: 1
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: all
+      - DISPLAY=${DISPLAY}
+      - LD_LIBRARY_PATH=/workspace/src/ma27
+      - ROS_LANG_DISABLE=genlisp;gennodejs;geneus
+      - ROS_LOG_DIR=/logging/node_logs
+      - ROS_MASTER_URI=http://simulator_local:11311 # Points to itself
+      - CATKIN_ENABLE_TESTING='0'
+      - QT_X11_NO_MITSHM=1
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
     command: >
-      bash -c "
+      bash -c '
       source /opt/ros/noetic/setup.bash &&
       roscore &
-      sleep 3 &&
+      sleep 5 &&
       source /workspace/devel/setup.bash &&
       roslaunch /workspace/src/simulator.launch &
       tail -f /dev/null
-      "
+      '
     volumes:
       - "./milliAmpere1_code/workspace:/workspace:rw"
       - "./milliAmpere1_code/logging:/logging:rw"
@@ -108,59 +116,9 @@ services:
       - "2020"
       - "2030"
       - "61200:61200"
+      - "11311:11311"
     stdin_open: true
     tty: true
-    networks:
-      - ros_net
+    # NETWORK_PLACEHOLDER # networks: [- ros_local_net] (for local mode)
 
-  real_vessel:
-    build: 
-      context: ./milliAmpere1_code
-      args:
-        USERNAME: ma
-        USER_UID: 1000
-        USER_GID: 1000
-      dockerfile: Dockerfile
-    container_name: real_vessel
-    hostname: real_vessel_container
-    environment:
-      DISPLAY: ${DISPLAY}
-      LD_LIBRARY_PATH: "/workspace/src/ma27"
-      ROS_LANG_DISABLE: 'genlisp;genjava;gennodejs;geneus'
-      ROS_LOG_DIR: /logging/node_logs
-      ROS_MASTER_URI: http://real_vessel:11311
-      ROS_HOSTNAME: real_vessel
-      XAUTHORITY: '/tmp/.docker.xauth'
-      PYTHONDONTWRITEBYTECODE: 1
-      CATKIN_ENABLE_TESTING: 0
-      QT_X11_NO_MITSHM: 1
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: all
-    volumes:
-      - "./milliAmpere1_code/workspace:/workspace:rw"
-      - "./milliAmpere1_code/logging:/logging:rw"
-      - "/tmp/.X11-unix:/tmp/.X11-unix:rw"
-      - "${HOME}/.Xauthority:/root/.Xauthority:rw"
-      - "/home/${USER}:/home/${USER}:rw"
-      - "/tmp/.docker.xauth:/tmp/.docker.xauth"
-    devices:
-      - "/dev/arduino_RC:/dev/arduino_RC"
-      - "/dev/xSens:/dev/xSens"
-      - "/dev/vector_vs330:/dev/vector_vs330"
-      - "/dev/ttyUSB0:/dev/ttyUSB0"   #IMU
-      #- "/dev/ttyACM0:/dev/ttyACM0"   #Arduino (RM)
-      - "/dev/ttyS0:/dev/ttyS0"       # GPS
-      - "/dev/ttyS1:/dev/ttyS1"       # GPS
-      - "/dev/ttyS2:/dev/ttyS2"       # GPS
-      - "/dev/ttyS3:/dev/ttyS3"       # GPS
-      - "/dev/ttyS4:/dev/ttyS4"       # GPS
-    stdin_open: true
-    tty: true
-    networks:
-      - ros_net
-    cap_add:
-      - NET_ADMIN
-  
-networks:
-  ros_net:
-    driver: bridge
+# NETWORK_DEFINITION_PLACEHOLDER # networks: ... (for local mode)

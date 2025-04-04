@@ -2,7 +2,7 @@
 FROM my-ros-base:latest
 
 # Install smach BEFORE building packages that depend on it
-RUN apt-get update && apt-get install -y ros-noetic-smach
+RUN apt-get update && apt-get install -y ros-noetic-smach inetutils-ping
 
 # Now copy the supervisor package
 WORKDIR /root/catkin_ws/src
