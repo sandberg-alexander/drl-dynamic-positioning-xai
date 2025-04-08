@@ -70,8 +70,23 @@
     "/app/models/training_20250404_165037/models/PPO_20250405_083042_steps_225280_update_110.zip",
     "/app/models/training_20250404_165037/models/PPO_20250405_081336_steps_221184_update_108.zip",
     "/app/models/training_20250404_165037/models/PPO_20250405_075631_steps_217088_update_106.zip",
-    "/app/models/training_20250404_165037/models/PPO_20250405_073925_steps_212992_update_104.zip"
+    "/app/models/training_20250404_165037/models/PPO_20250405_073925_steps_212992_update_104.zip",
+    "/app/models/training_20250404_165037/models/PPO_20250405_072220_steps_208896_update_102.zip",
+    "/app/models/training_20250404_165037/models/PPO_20250405_070514_steps_204800_update_100.zip",
+    "/app/models/training_20250404_165037/models/PPO_20250405_064809_steps_200704_update_98.zip",
+    "/app/models/training_20250404_165037/models/PPO_20250405_063103_steps_196608_update_96.zip",
+    "/app/models/training_20250404_165037/models/PPO_20250405_061358_steps_192512_update_94.zip",
+    "/app/models/training_20250404_165037/models/PPO_20250405_055652_steps_188416_update_92.zip",
+    "/app/models/training_20250404_165037/models/PPO_20250405_053947_steps_184320_update_90.zip",
+    "/app/models/training_20250404_165037/models/PPO_20250405_052241_steps_180224_update_88.zip",
+    "/app/models/training_20250404_165037/models/PPO_20250405_050536_steps_176128_update_86.zip",
+    "/app/models/training_20250404_165037/models/PPO_20250405_044830_steps_172032_update_84.zip",
+    "/app/models/training_20250404_165037/models/PPO_20250405_043125_steps_167936_update_82.zip",
+    "/app/models/training_20250404_165037/models/PPO_20250405_041419_steps_163840_update_80.zip",
+    "/app/models/training_20250404_165037/models/PPO_20250405_035714_steps_159744_update_78.zip",
+    "/app/models/training_20250404_165037/models/PPO_20250405_034008_steps_155648_update_76.zip",
+    "/app/models/training_20250404_165037/models/PPO_20250405_032303_steps_151552_update_74.zip"
   ],
-  "current_model": "/app/models/training_20250404_165037/models/PPO_20250405_072220_steps_208896_update_102.zip",
-  "completed_episodes": 4
+  "current_model": "/app/models/training_20250404_165037/models/PPO_20250405_030557_steps_147456_update_72.zip",
+  "completed_episodes": 0
 }

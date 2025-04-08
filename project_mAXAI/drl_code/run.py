@@ -21,7 +21,7 @@ def main():
     Starting DRL training in clean environment ...
     """)
 
-    model = PPO.load("/app/models/training_20250404_165037/models/PPO_20250405_090453_steps_233472_update_114.zip")
+    model = PPO.load("/app/models/training_20250404_165037/models/PPO_20250405_034008_steps_155648_update_76.zip")
     env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v4", render_mode='human', max_time_steps=1000)
     model.set_env(env)
     
