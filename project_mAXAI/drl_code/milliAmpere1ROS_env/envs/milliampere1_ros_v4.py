@@ -79,7 +79,8 @@ class MilliAmpere1RosEnvV4(gym.Env):
 
         self.obs_time = None
         self.obs_time_prev = None
-        self.eta_obs = np.array([self.north, self.east, 0])
+        self.eta_obs = np.zeros(3)
+        #self.eta_obs = np.array([self.north, self.east, 0])
         self.eta_obs_prev = self.eta_obs.copy()
         self.epsilon_obs = None
         self.epsilon = np.zeros(3)
@@ -172,6 +173,7 @@ class MilliAmpere1RosEnvV4(gym.Env):
         self.time_step = 0
         self.terminated_flag = False
         self.target_pose = self.np_random.uniform(-1,1,3) * self.target_bounds + np.array([self.eta_obs[0], self.eta_obs[1], 0])
+        #self.target_pose = self.np_random.uniform(-1,1,3) * self.target_bounds
         print(f"New target at {self.target_pose}")
 
         # Init actuators

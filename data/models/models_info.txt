@@ -7,3 +7,8 @@ training_20250328_145357
     trained in MilliAmpere1ROS-v2
     trained on laptop
     trained with reset service
+
+training_20250404_165037
+    trained in MilliAmpere1ROS-v4
+    trained on uni pc
+    trained with no reset service

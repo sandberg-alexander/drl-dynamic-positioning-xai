@@ -7,7 +7,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 # Find the latest training run directory automatically, or set manually
 # LATEST_RUN_DIR=$(ls -td /app/models/training_* | head -n 1)
 # OR specify directly:
-RUN_DIR="/app/models/training_20250328_131443" # <<< CHANGE THIS IF NEEDED
+RUN_DIR="/app/models/training_20250404_165037" # <<< CHANGE THIS IF NEEDED
 NUM_EPISODES=5                             # <<< SET EPISODES HERE
 
 # Construct the full path to the python script

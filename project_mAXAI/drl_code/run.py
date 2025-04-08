@@ -21,15 +21,17 @@ def main():
     Starting DRL training in clean environment ...
     """)
 
-    model = PPO.load("/app/models/training_20250328_131443/models/best_model.zip")
-    env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v3", render_mode='human', max_time_steps=150)
+    model = PPO.load("/app/models/training_20250404_165037/models/PPO_20250405_090453_steps_233472_update_114.zip")
+    env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v4", render_mode='human', max_time_steps=1000)
     model.set_env(env)
     
     pub_obs_act_ref_pair = rospy.Publisher('/drl/observation_actuator_ref_pair', ObservationActuatorRefPair, queue_size=1)
     obs_act_ref_pair = ObservationActuatorRefPair()
 
-    observation, info = env.reset()
+    observation, info = env.reset(seed=42)
+    i=0
     while True:
+        i+=1
         # Handle Pygame events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -71,7 +73,7 @@ def main():
 
 
         if terminated or truncated:
-            observation, info = env.reset()
+            observation, info = env.reset(seed=42+i)
 
 if __name__ == '__main__':
     main()

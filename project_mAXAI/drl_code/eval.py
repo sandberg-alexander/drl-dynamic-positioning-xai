@@ -130,7 +130,7 @@ def evaluate_one_model(model_path, tracker, eval_dir, n_eval_episodes=10):
 
         # --- Create Environment ---
         print(f"Creating environment instance for model {model_name}...")
-        env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v2", render_mode='human', max_time_steps=1000)
+        env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v5", render_mode='human', max_time_steps=1000)
         print("Environment created.")
         os.makedirs(temp_dir, exist_ok=True)
 
@@ -143,11 +143,15 @@ def evaluate_one_model(model_path, tracker, eval_dir, n_eval_episodes=10):
         print(f"Starting evaluation loop from episode {start_episode + 1} to {n_eval_episodes}")
         successful_episodes_this_run = 0
 
+        seed=42
+
         for i in range(start_episode, n_eval_episodes):
             current_episode_num = i + 1
             print(f"\n--- Running Episode {current_episode_num}/{n_eval_episodes} ---")
 
-            obs, info = env.reset()
+            episode_seed = seed + i
+            print(f"------EPISODE SEED------\n{episode_seed} {start_episode} {i}")
+            obs, info = env.reset(seed=episode_seed)
             done = False
             truncated = False
             episode_reward = 0

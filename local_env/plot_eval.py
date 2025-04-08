@@ -6,7 +6,7 @@ import os
 import re
 import argparse # For specifying the directory easily
 
-def plot_evaluation_rewards(run_dir, output_file='plots/drl/eval/evaluation_rewards_1_r.pdf'):
+def plot_evaluation_rewards(run_dir, output_file='plots/drl/eval/evaluation_rewards_3_r.pdf'):
     """
     Reads monitor.csv files from evaluation subdirectories, calculates average
     rewards, and plots them.
