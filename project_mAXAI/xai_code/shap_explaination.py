@@ -149,8 +149,8 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
 
     # Define models and environments
-    model = PPO.load("/app/models/training_20250328_131443/models/best_model.zip")
-    env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v3", render_mode='human', max_time_steps=200)
+    model = PPO.load("/app/models/training_20250404_165037/models/PPO_20250405_034008_steps_155648_update_76.zip")
+    env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v5", render_mode='human', max_time_steps=200)
     obs2action_model = Obs2ActionWrapper(model)
     obs2value_model = Obs2ValueWrapper(model)
 
@@ -242,19 +242,21 @@ def main():
             shap_values_value = explainer_value.shap_values(obs_tensor)
             
             # calculate render arguments
+            shap_values_action_list = [arr.flatten().tolist() for arr in shap_values_action]
+            shap_values_value_list = [arr.flatten().tolist() for arr in shap_values_value]
             tot_thrust, tot_angle, tot_angular_thrust = combine_actuator_ref(actuator_ref, actuator_pos)
             x_tilde = obs[0] * max_distance
             y_tilde = obs[1] * max_distance
             psi_tilde = obs[2] * max_heading_angle
-            u_hat = obs[3] * max_linear_speed
-            v_hat = obs[4] * max_linear_speed
-            r_hat = obs[5] * max_angular_speed
+            u_hat = obs[3] * max_linear_speed*2
+            v_hat = obs[4] * max_linear_speed*2
+            r_hat = obs[5] * 360*2
 
             # cap fps to fps limit
             clock.tick(fps)
             try:
                 render.render_frame(
-                    shap_values_action,
+                    shap_values_action_list,
                     shap_values_value,
                     actuator_ref,
                     tot_thrust,
