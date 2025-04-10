@@ -44,7 +44,9 @@ def main():
                 return
 
         action, _states = model.predict(observation, deterministic=True)
-        observation, reward, terminated, truncated, info = env.step(action)
+        observation_next, reward, terminated, truncated, info = env.step(action)
+        current_thrusters = env.thrusters
+        current_angles = env.angles
 
         obs_act_ref_pair.x_tilde = observation[0]
         obs_act_ref_pair.y_tilde = observation[1]
@@ -60,17 +62,18 @@ def main():
         obs_act_ref_pair.n_y3d_prev = observation[11]
         obs_act_ref_pair.n_x4d_prev = observation[12]
         obs_act_ref_pair.n_y4d_prev = observation[13]
-        obs_act_ref_pair.n_d1 = info['thrusters'][0]
-        obs_act_ref_pair.alpha_d1 = info['angles'][0]
-        obs_act_ref_pair.n_d2 = info['thrusters'][1]
-        obs_act_ref_pair.alpha_d2 = info['angles'][1]
-        obs_act_ref_pair.n_d3 = info['thrusters'][2]
-        obs_act_ref_pair.alpha_d3 = info['angles'][2]
-        obs_act_ref_pair.n_d4 = info['thrusters'][3]
-        obs_act_ref_pair.alpha_d4 = info['angles'][3]
+        obs_act_ref_pair.n_d1 = current_thrusters[0]
+        obs_act_ref_pair.alpha_d1 = current_angles[0]
+        obs_act_ref_pair.n_d2 = current_thrusters[1]
+        obs_act_ref_pair.alpha_d2 = current_angles[1]
+        obs_act_ref_pair.n_d3 = current_thrusters[2]
+        obs_act_ref_pair.alpha_d3 = current_angles[2]
+        obs_act_ref_pair.n_d4 = current_thrusters[3]
+        obs_act_ref_pair.alpha_d4 = current_angles[3]
 
         pub_obs_act_ref_pair.publish(obs_act_ref_pair)
 
+        observation=observation_next
 
         if terminated or truncated:
             observation, info = env.reset(seed=42+i)

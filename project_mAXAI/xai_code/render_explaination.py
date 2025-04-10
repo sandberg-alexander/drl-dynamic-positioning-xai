@@ -575,8 +575,8 @@ class BodyRender(VesselRender):
         self.draw_arrow(self._degrees2pygame(alpha_d), self._scalar2pygame(n_d), Color.DESIRED_YELLOW.value, center)
         #moment_norm = self.calulate_total_moment(thrusters)
         radius = self._scalar2pygame(self.VESSEL_MOMENT_MARKER)
-        angular_thrust_ref *= self.SCALE/radius
-        self._draw_curved_arrow(angular_thrust_ref, center, Color.DESIRED_YELLOW.value, radius)
+        angular_thrust_ref1 = angular_thrust_ref * self.SCALE/radius
+        self._draw_curved_arrow(angular_thrust_ref1, center, Color.DESIRED_YELLOW.value, radius)
 
 
     def _draw_velocities(self, u_hat, v_hat, r_hat):
@@ -716,6 +716,8 @@ class ShapExplainRender(VesselRender, Utilities):
         self.explain_mode = -1
         self.RPM_true = True
         self.explain_vector = False
+        self.prev_angle_1 = np.array([135, -135, -45, 45])
+        self.prev_angle_2 = np.array([135, -135, -45, 45])
 
         self.actuator_pos = np.array([[self.ACTUATOR_X, -self.ACTUATOR_Y],
                                             [self.ACTUATOR_X, self.ACTUATOR_Y],
@@ -727,7 +729,8 @@ class ShapExplainRender(VesselRender, Utilities):
         if list_in_list:
             # Calculate the combined absolute values for each index
             for i in range(len(lists[0])):
-                total = sum(abs(lst[i]) for lst in lists)
+                #total = sum(abs(lst[i]) for lst in lists)
+                total = sum(np.sqrt(lists[2*j][i]**2 + lists[2*j+1][i]**2) for j in range(len(lists)//2))
                 combined_values.append((i, total))  # Store (index, value) pairs
         else:
             for i in range(len(lists)):
@@ -1253,31 +1256,105 @@ class ShapExplainRender(VesselRender, Utilities):
             ang_thrust += rpm[2*i] * y
             ang_thrust += rpm[2*i+1] * x
         return ang_thrust        
+    
+    def _calculate_actuator_inputs(self, action, prev_angle):
+        thrusters = np.zeros(4)
+        angles = np.zeros(4)
+        vec = []
+        # Process each thruster
+        for i in range(4):
+            x = action[i*2]
+            y = action[i*2 + 1]
 
-    def _draw_explaination4(self, shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors):
+            if x == 0 and y == 0:
+                # add 0 thrust and angle
+                thrusters[i] = 0
+                angles[i] = prev_angle[i]
+                vec.append((0.0, prev_angle[i]))
+                continue
+
+            angle = np.arctan2(y, x)
+            if angle == np.pi and i ==1:
+                angle = -np.pi
+            thrust = np.clip(np.sqrt(x**2 + y**2), 0, 1)
+            
+            angles[i] = angle / np.pi * 180
+            thrusters[i] = thrust * 900
+            vec.append((thrust, angles[i]))
+        return thrusters, angles, angles, vec
+        
+    def _combine_actuator_ref(self, actuator_ref, actuator_pos):
+        thrust_x = 0
+        thrust_y = 0
+        tot_angular_thrust = 0
+        for i, ((thrust, angle), (x,y)) in enumerate(zip(actuator_ref, actuator_pos)):
+            rad = np.deg2rad(90*(i+1)-angle)
+            angle = angle * np.pi/180
+
+            thrust_x += thrust * math.cos(angle)
+            thrust_y += thrust * math.sin(angle)
+
+            if x*y < 0:
+                ang_thrust = abs(x) * thrust * np.cos(rad) + abs(y) * thrust * np.sin(rad)
+            else:
+                ang_thrust = abs(x) * thrust * np.sin(rad) + abs(y) * thrust * np.cos(rad)
+            tot_angular_thrust += ang_thrust
+
+        tot_thrust = math.hypot(thrust_x, thrust_y)
+        tot_angle = math.atan2(thrust_y, thrust_x) * 180/np.pi
+
+        return tot_thrust, tot_angle, tot_angular_thrust
+
+    def _draw_explaination4(self, shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors, action_low, action_high):
         
 
         arr_RPM = np.array(shap_values_action)
         #print(arr_RPM)
         # arr_angles = np.array(shap_values_angles)
-        shap_feature_RPM = arr_RPM[:, self.idx] * 900
-        #print(shap_feature_RPM)
-        #print('')
-        base_x = sum(base_vectors[i*2] for i in range(len(base_vectors)//2))
-        base_y = sum(base_vectors[i+1*2] for i in range(len(base_vectors)//2))
-        base_vector = (np.sqrt(base_x**2 + base_y**2), np.arctan2(base_y, base_x), self._calculate_angular_thrust(base_vectors))
-        print(base_vector)
-        vec = np.zeros((len(shap_feature_RPM)//2,2))
-        for i in range(len(shap_feature_RPM)//2):
-            thr =  np.clip(np.sqrt(shap_feature_RPM[i*2]**2 + shap_feature_RPM[i*2+1]**2),0, 900)
-            ang = np.arctan2(shap_feature_RPM[i*2+1],shap_feature_RPM[i*2])*180/np.pi
-            vec[i] = (thr, ang)
-            
+        shap_feature_RPM = arr_RPM[:, self.idx]
+        summed_array = np.sum(arr_RPM, axis=1)
+        # --- CLIP the reconstructed predictions ---
+
+        reconstructed_pred_main_feature = np.clip(shap_feature_RPM + base_vectors, action_low, action_high) # Clip here
+        #reconstructed_pred_main_feature = shap_feature_RPM + base_vectors # Clip here
+        reconstructed_pred_total = np.clip(summed_array + base_vectors, action_low, action_high)          # Clip here
 
 
-        vector = self._add_vectors_polar(vec)
-        print(vector)
-        vector_base = self._add_vectors_polar(base_vector, vector)
+        thrusters, angles, self.prev_angle_1, vec = self._calculate_actuator_inputs(reconstructed_pred_main_feature, self.prev_angle_1)
+        thrusters2, angles2, self.prev_angle_2, vec2 = self._calculate_actuator_inputs(reconstructed_pred_total, self.prev_angle_2)
+
+        vector = self._combine_actuator_ref(vec, self.actuator_pos)
+        vector2 = self._combine_actuator_ref(vec2, self.actuator_pos)
+        # print('vector2')
+        # print(vector2)
+        # print('actuator_ref')
+        # print(tot_thrust, tot_angle, tot_angular_thrust)
+        # print('')
+        # print('vec2')
+        # print(vec2)
+        # print('actuator_ref')
+        # print(actuator_ref)
+        # print('')
+
+
+        # print(summed_array + base_vectors)
+        # ##print(shap_feature_RPM)
+        # #print('')
+        # #print(base_vectors)
+        # vec = np.zeros((len(shap_feature_RPM)//2,2))
+        # vec2 = np.zeros((len(shap_feature_RPM)//2,2))
+        # for i in range(len(shap_feature_RPM)//2):
+        #     thr =  np.sqrt((shap_feature_RPM[i*2] + base_vectors[i*2])**2  + (shap_feature_RPM[i*2+1] + base_vectors[i*2+1])**2)
+        #     thr2 =  np.sqrt((summed_array[i*2] + base_vectors[i*2])**2  + (summed_array[i*2+1] + base_vectors[i*2+1])**2)
+        #     ang = np.arctan2((shap_feature_RPM[i*2+1] + base_vectors[i*2+1]),(shap_feature_RPM[i*2] + base_vectors[i*2]))*180/np.pi
+        #     ang2 = np.arctan2((summed_array[i*2+1] + base_vectors[i*2+1]),(summed_array[i*2] + base_vectors[i*2]))*180/np.pi
+        #     vec[i] = (thr, ang)
+        #     vec2[i] = (thr2, ang2)
+
+        # vector = self._add_vectors_polar(vec)
+        # vector2 = self._add_vectors_polar(vec2)
+        # #print(vector)
+        #vector_base = self._add_vectors_polar(base_vector, vector)
 
         x = sum(shap_feature_RPM[i*2] for i in range(len(shap_feature_RPM)//2))
         y = sum(shap_feature_RPM[i*2+1] for i in range(len(shap_feature_RPM)//2))
@@ -1307,9 +1384,13 @@ class ShapExplainRender(VesselRender, Utilities):
         #     # Angular RPMS for all SHAP features (estimate of total angular RPM)
         #     self._draw_curved_arrow(self._scalar2pygame(tot_vector_base[2])/(1200*radius), self.center, Color.PURPLE.value, radius=radius+10)
         #     # Total angular RPM
-        self._draw_curved_arrow(self._scalar2pygame(tot_angular_thrust)/radius, self.center, Color.VELOCITY_GREEN.value, radius=radius+10)
-        self._draw_curved_arrow(np.clip(self._scalar2pygame(ang_thrust)/(900*radius),-2*np.pi,2*np.pi), self.center, Color.DESIRED_LIGHT_YELLOW.value, radius=radius, arrowhead_length=5, arrowhead_widht=5)
-        self._draw_curved_arrow(np.clip(self._scalar2pygame(vector[2])/(900*radius),-2*np.pi,2*np.pi), self.center, Color.RED.value, radius=radius, arrowhead_length=5, arrowhead_widht=5)
+        #self._draw_curved_arrow(self._scalar2pygame(tot_angular_thrust)/radius, self.center, Color.VELOCITY_GREEN.value, radius=radius+10)
+        #self._draw_curved_arrow(np.clip(self._scalar2pygame(ang_thrust)/(900*radius),-2*np.pi,2*np.pi), self.center, Color.DESIRED_LIGHT_YELLOW.value, radius=radius, arrowhead_length=5, arrowhead_widht=5)
+        #self._draw_curved_arrow(self._scalar2pygame(vector2[2])/radius, self.center, Color.PURPLE.value, radius=radius+10)
+        self._draw_curved_arrow(self._scalar2pygame(vector[2])/radius, self.center, Color.DESIRED_LIGHT_YELLOW.value, radius=radius)
+
+        #self._draw_curved_arrow(np.clip(self._scalar2pygame(vector2[2])/(900*radius),-2*np.pi,2*np.pi), self.center, Color.PURPLE.value, radius=radius+10)
+        #self._draw_curved_arrow(np.clip(self._scalar2pygame(vector[2])/(900*radius),-2*np.pi,2*np.pi), self.center, Color.DESIRED_LIGHT_YELLOW.value, radius=radius, arrowhead_length=5, arrowhead_widht=5)
         #print(self._scalar2pygame(ang_thrust)/(900*radius))      
         # Base vector
         #self._draw_arrow(self._degrees2pygame(base_vector[1]), self._scalar2pygame(base_vector[0]/1200), Color.BLACK.value, self.center)
@@ -1325,14 +1406,18 @@ class ShapExplainRender(VesselRender, Utilities):
         #     # Thruster vector for all SHAP features (estimate of totalt thruster vector)
         #     self._draw_arrow(self._degrees2pygame(tot_vector_base[1]), self._scalar2pygame(tot_vector_base[0]/1200), Color.PURPLE.value, self.center)
         #     # Total thruster vector
-        self._draw_arrow(self._degrees2pygame(tot_angle), self._scalar2pygame(tot_thrust), Color.VELOCITY_GREEN.value, self.center)
+        #self._draw_arrow(self._degrees2pygame(tot_angle), self._scalar2pygame(tot_thrust), Color.VELOCITY_GREEN.value, self.center)
         
         # Thruster vector from base for single SHAP feature
         #self._draw_arrow(self._degrees2pygame(main_feature_vector[1]), self._scalar2pygame(main_feature_vector[0]/1200), Color.DESIRED_LIGHT_YELLOW.value, (self.center[0]+y1,self.center[1]-x1))
         # self._draw_arrow(self._degrees2pygame(main_feature_vector_base[1]), self._scalar2pygame(main_feature_vector_base[0]/1200), Color.DESIRED_LIGHT_YELLOW.value, self.center, arrowhead_width=5, arrowhead_length=5)
-        self._draw_arrow(self._degrees2pygame(angle*180/np.pi), self._scalar2pygame(thrust/900), Color.DESIRED_LIGHT_YELLOW.value, (self.center[0],self.center[1]))
-        self._draw_arrow(self._degrees2pygame(vector[1]), self._scalar2pygame(vector[0]/900), Color.RED.value, (self.center[0],self.center[1]))
-        self._draw_arrow(self._degrees2pygame(vector_base[1]), self._scalar2pygame(vector_base[0]/900), Color.PURPLE.value, (self.center[0],self.center[1]))
+        #self._draw_arrow(self._degrees2pygame(angle*180/np.pi), self._scalar2pygame(thrust/900), Color.DESIRED_LIGHT_YELLOW.value, (self.center[0],self.center[1]))
+        #self._draw_arrow(self._degrees2pygame(vector2[1]), self._scalar2pygame(vector2[0]), Color.PURPLE.value, self.center)
+        self._draw_arrow(self._degrees2pygame(vector[1]), self._scalar2pygame(vector[0]), Color.DESIRED_LIGHT_YELLOW.value, self.center)
+        
+        #self._draw_arrow(self._degrees2pygame(vector2[1]), self._scalar2pygame(vector2[0]/900), Color.PURPLE.value, (self.center[0],self.center[1]))
+        #self._draw_arrow(self._degrees2pygame(vector[1]), self._scalar2pygame(vector[0]/900), Color.DESIRED_LIGHT_YELLOW.value, (self.center[0],self.center[1]))
+        #self._draw_arrow(self._degrees2pygame(vector_base[1]), self._scalar2pygame(vector_base[0]/900), Color.PURPLE.value, (self.center[0],self.center[1]))
 
 
 
@@ -1355,48 +1440,63 @@ class ShapExplainRender(VesselRender, Utilities):
         elif self.idx == 5:
             self._draw_curved_arrow(np.deg2rad(r_hat), self.center, Color.RED.value, radius=self._scalar2pygame(self.VESSEL_LENGTH/2)+self.explain_offset, show_measurement=True, label=f"{r_hat*112.6/(360*2):.0f} °/s")
 
-        # error = np.array([tot_thrust*1200, tot_angle, tot_angular_thrust*1200]) - np.array([tot_vector_base[0], tot_vector_base[1], tot_vector_base[2]])
+        error = np.array([tot_thrust*900, tot_angle, tot_angular_thrust*900]) - np.array([vector[0]*900, vector[1], vector[2]*900])
 
-        # acc_RPM = (2400*4-abs(error[0]))/(2400*4)
-        # acc_angle = (360-abs(error[1]))/360
-        # acc_moment = (2400*4*1.8 - abs(error[2]))/(2400*4*1.8)
+        acc_RPM = (900*2*2-abs(error[0]))/(900*2*2)
+        acc_angle = (360-abs(error[1]))/360
+        acc_moment = (900*2*2*(1.8+0.8) - abs(error[2]))/(900*2*2*(1.8+0.8))
 
-        # if acc_RPM > 0.9:
-        #     acc_RPM_color = Color.GREEN.value
-        # elif acc_RPM > 0.8:
-        #     acc_RPM_color = Color.ORANGE.value
-        # else:
-        #     acc_RPM_color = Color.RED.value
-        
-        # if acc_angle > 0.9:
-        #     acc_angle_color = Color.GREEN.value
-        # elif acc_angle > 0.8:
-        #     acc_angle_color = Color.ORANGE.value
-        # else:
-        #     acc_angle_color = Color.RED.value
-        
-        # if acc_moment > 0.9:
-        #     acc_moment_color = Color.GREEN.value
-        # elif acc_moment > 0.8:
-        #     acc_moment_color = Color.ORANGE.value
-        # else:
-        #     acc_moment_color = Color.RED.value
+        acc_total = (acc_RPM+acc_angle+acc_moment)/3
 
-        # text_surface1 = self.window_font.render(f"Accuracy RPM: {acc_RPM:.2f}", self.antialias, acc_RPM_color)
-        # text_rect1 = text_surface1.get_rect()
-        # text_rect1.topleft = (self._title_offset, self._title_offset*10)
+        if acc_RPM > 0.75:
+            acc_RPM_color = Color.GREEN.value
+        elif acc_RPM > 0.5:
+            acc_RPM_color = Color.ORANGE.value
+        else:
+            acc_RPM_color = Color.RED.value
         
-        # text_surface2 = self.window_font.render(f"Accuracy angle: {acc_angle:.2f}", self.antialias, acc_angle_color)
-        # text_rect2 = text_surface2.get_rect()
-        # text_rect2.topleft = (self._title_offset, self._title_offset*11+text_rect1.height)
+        if acc_angle > 0.75:
+            acc_angle_color = Color.GREEN.value
+        elif acc_angle > 0.5:
+            acc_angle_color = Color.ORANGE.value
+        else:
+            acc_angle_color = Color.RED.value
+        
+        if acc_moment > 0.75:
+            acc_moment_color = Color.GREEN.value
+        elif acc_moment > 0.5:
+            acc_moment_color = Color.ORANGE.value
+        else:
+            acc_moment_color = Color.RED.value
 
-        # text_surface3 = self.window_font.render(f"Accuracy moment: {acc_moment:.2f}", self.antialias, acc_moment_color)
-        # text_rect3 = text_surface3.get_rect()
-        # text_rect3.topleft = (self._title_offset, self._title_offset*12+text_rect1.height+text_rect2.height)
+        if acc_total > 0.75:
+            acc_total_color = Color.GREEN.value
+        elif acc_total > 0.5:
+            acc_total_color = Color.ORANGE.value
+        else:
+            acc_total_color = Color.RED.value
+     
+     
+        text_surface1 = self.window_font.render(f"Explained RPM: {acc_RPM:.2f}", self.antialias, acc_RPM_color)
+        text_rect1 = text_surface1.get_rect()
+        text_rect1.topleft = (self._title_offset, self._title_offset*10)
         
-        # self.surface.blit(text_surface1, text_rect1)
-        # self.surface.blit(text_surface2, text_rect2)
-        # self.surface.blit(text_surface3, text_rect3)
+        text_surface2 = self.window_font.render(f"Explained angle: {acc_angle:.2f}", self.antialias, acc_angle_color)
+        text_rect2 = text_surface2.get_rect()
+        text_rect2.topleft = (self._title_offset, self._title_offset*11+text_rect1.height)
+
+        text_surface3 = self.window_font.render(f"Explained moment: {acc_moment:.2f}", self.antialias, acc_moment_color)
+        text_rect3 = text_surface3.get_rect()
+        text_rect3.topleft = (self._title_offset, self._title_offset*12+text_rect1.height+text_rect2.height)
+
+        text_surface4 = self.window_font.render(f"Explained TOTAL: {acc_total:.2f}", self.antialias, acc_total_color)
+        text_rect4 = text_surface4.get_rect()
+        text_rect4.topleft = (self._title_offset, self._title_offset*14+text_rect1.height+text_rect2.height+text_rect3.height)
+        
+        self.surface.blit(text_surface1, text_rect1)
+        self.surface.blit(text_surface2, text_rect2)
+        self.surface.blit(text_surface3, text_rect3)
+        self.surface.blit(text_surface4, text_rect4)
 
 
     def _draw_explaination3(self, error_x, error_y, error_psi, u_hat, v_hat, r_hat, shap_values_RPM, shap_values_angles, base_vectors, n_d, alpha_d, thrusters):
@@ -1473,23 +1573,23 @@ class ShapExplainRender(VesselRender, Utilities):
         acc_angle = (360-abs(error[1]))/360
         acc_moment = (2400*4*1.8 - abs(error[2]))/(2400*4*1.8)
 
-        if acc_RPM > 0.9:
+        if acc_RPM > 0.75:
             acc_RPM_color = Color.GREEN.value
-        elif acc_RPM > 0.8:
+        elif acc_RPM > 0.5:
             acc_RPM_color = Color.ORANGE.value
         else:
             acc_RPM_color = Color.RED.value
         
-        if acc_angle > 0.9:
+        if acc_angle > 0.75:
             acc_angle_color = Color.GREEN.value
-        elif acc_angle > 0.8:
+        elif acc_angle > 0.50:
             acc_angle_color = Color.ORANGE.value
         else:
             acc_angle_color = Color.RED.value
         
-        if acc_moment > 0.9:
+        if acc_moment > 0.75:
             acc_moment_color = Color.GREEN.value
-        elif acc_moment > 0.8:
+        elif acc_moment > 0.50:
             acc_moment_color = Color.ORANGE.value
         else:
             acc_moment_color = Color.RED.value
@@ -1511,7 +1611,7 @@ class ShapExplainRender(VesselRender, Utilities):
         self.surface.blit(text_surface3, text_rect3)
 
 
-    def render(self, shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors):
+    def render(self, shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors, action_low, action_high):
         #print(1)
         # #self._find_explaination(shap_values_EV, n=1, list_in_list=False)
         # if explain_mode != self.explain_mode:
@@ -1548,7 +1648,7 @@ class ShapExplainRender(VesselRender, Utilities):
         #print(5)
         #self._draw_explaination(shap_values_EV, shap_values_RPM, thrusters, y_err, x_err, psi_err, u_hat, v_hat, r_hat)
         #self._draw_explaination2(y_err, x_err, psi_err, u_hat, v_hat, r_hat, shap_values_RPM, shap_values_angles, base_vectors, n_d, alpha_d, thrusters)
-        self._draw_explaination4(shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors)
+        self._draw_explaination4(shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors, action_low, action_high)
         #print(6)
         self.draw_legend(self.legend_surface, self.box_pos)
         #print(7)
@@ -1571,7 +1671,7 @@ class ShapRender(Window):
         self.window_padding = 40 # pixels
         self.num_bars = 3 #14 # number of features
         self.num_bar_seg = 4 # number of outputs
-        self.max_shap_value = 5
+        self.max_shap_value = 4
         self.increment = 1
 
         self.bar_gap = 50 # pixels
@@ -1590,14 +1690,14 @@ class ShapRender(Window):
             'ûₜ [m/s]',
             'v̂ₜ [m/s]',
             'r̂ₜ [°/s]',
-            'n_{d₁,ₜ₋₁} [RPM]',
-            'n_{d₂,ₜ₋₁} [RPM]',
-            'n_{d₃,ₜ₋₁} [RPM]',
-            'n_{d₄,ₜ₋₁} [RPM]',
-            'α_{d₁,ₜ₋₁} [°]',
-            'α_{d₂,ₜ₋₁} [°]',
-            'α_{d₃,ₜ₋₁} [°]',
-            'α_{d₄,ₜ₋₁} [°]'
+            'n_{x1d,ₜ₋₁} [RPM]',
+            'n_{y1d,ₜ₋₁} [RPM]',
+            'n_{x2d,ₜ₋₁} [RPM]',
+            'n_{y2d,ₜ₋₁} [RPM]',
+            'n_{x3d,ₜ₋₁} [RPM]',
+            'n_{y3d,ₜ₋₁} [RPM]',
+            'n_{x4d,ₜ₋₁} [RPM]',
+            'n_{y4d,ₜ₋₁} [RPM]'
         ]
 
         # colors
@@ -1672,12 +1772,12 @@ class ShapRender(Window):
 
     # public functions ############################
 
-    def render(self, shap_values, shap_values3, explain_mode):
+    def render(self, shap_values, shap_values3, base_value, action_low, action_high):
         # init
         self.render_surface()
         
         # SHAP render
-        self._draw_bars(shap_values, shap_values3, explain_mode)
+        self._draw_bars(shap_values, shap_values3,base_value, action_low, action_high)
         self._draw_axis()
         self.draw_legend(self.legend_surface,self.box_pos)
         
@@ -1697,7 +1797,7 @@ class ShapRender(Window):
         if list_in_list:
             # Calculate the combined absolute values for each index
             for i in range(len(lists[0])):
-                total = sum(abs(lst[i]) for lst in lists)
+                total = sum(np.sqrt(lists[2*j][i]**2 + lists[2*j+1][i]**2) for j in range(len(lists)//2))
                 combined_values.append((i, total))  # Store (index, value) pairs
         else:
             for i in range(len(lists)):
@@ -1711,34 +1811,47 @@ class ShapRender(Window):
         
         return top_indices
 
-    def _draw_bars(self, shap_values,shap_value3,explain_mode):
-        if explain_mode != self.explain_mode:
-            self.explain_mode = explain_mode
-            if self.RPM_true:
-                self.RPM_true = False
-                self._title = "Most influential features based on estimated values (SHAP)"
-            else:
-                self.RPM_true = True
-                self._title = "Most influential features based on actions (SHAP)"
+    def _draw_bars(self, shap_values,shap_value3,base_value, action_low, action_high):
+        # if explain_mode != self.explain_mode:
+        #     self.explain_mode = explain_mode
+        #     if self.RPM_true:
+        #         self.RPM_true = False
+        #         self._title = "Most influential features based on estimated values (SHAP)"
+        #     else:
+        #         self.RPM_true = True
+        #         self._title = "Most influential features based on actions (SHAP)"
+        #self.RPM_true=False
+
+
         if self.RPM_true:
             shap_val = shap_values
         else:
             shap_val = shap_value3
 
         indices = self._find_top_n_abs_combined_indices(shap_val, list_in_list=self.RPM_true)
+
         for i,idx in enumerate(indices):
+
             bar_seg_px = self.window_padding / 2 + self.axis_padding_width
 
-            shap = shap_value3[idx]            
+            shap = shap_value3[idx]      
+ 
             bar_seg_length = self._shap_value_2_pixels(shap)
-            if shap > 0:
-                pygame.draw.rect(self.surface, Color.GREEN.value, (bar_seg_px, self.bars_py[i]+self.bar_gap, bar_seg_length, self.bar_height))
-            else:
-                pygame.draw.rect(self.surface, Color.RED.value, (bar_seg_px, self.bars_py[i]+self.bar_gap, -bar_seg_length, self.bar_height))
+            # if shap > 0:
+            #     pygame.draw.rect(self.surface, Color.GREEN.value, (bar_seg_px, self.bars_py[i]+self.bar_gap, bar_seg_length, self.bar_height))
+            # else:
+            #     pygame.draw.rect(self.surface, Color.RED.value, (bar_seg_px, self.bars_py[i]+self.bar_gap, -bar_seg_length, self.bar_height))
 
             for bar_seg in range(self.num_bar_seg):
-                shap_value = abs(shap_values[bar_seg][idx])
+                #shap_value = abs(shap_values[bar_seg][idx])
+                #print(1)
+                arr_RPM = np.array(shap_values)
+                reconstructed = np.clip(arr_RPM[:,idx] + base_value, action_low, action_high)
+                #print(reconstructed)
+                shap_value = np.clip(np.sqrt(reconstructed[2*bar_seg]**2+reconstructed[2*bar_seg+1]**2),0,1)
+                #print(2.5)
                 bar_seg_length = self._shap_value_2_pixels(shap_value)
+                #print(3)
                 pygame.draw.rect(self.surface, self.colors[bar_seg],
                                  (bar_seg_px, self.bars_py[i], bar_seg_length, self.bar_height))
                 bar_seg_px += bar_seg_length
@@ -1806,13 +1919,13 @@ class RenderExplaination():
 
 
 
-    def render_frame(self, shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors):
+    def render_frame(self, shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors, action_low, action_high):
         self._screen.fill(Color.SCREEN_COLOR.value)
         self._body_window.render(actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat)
         self._ned_window.render(x_tilde, y_tilde, psi_tilde)
-        self._shap_explain_window.render(shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors)
+        self._shap_explain_window.render(shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors, action_low, action_high)
 
-        #self._shap_window_top.render(shap_values_action, shap_values_value)
+        self._shap_window_top.render(shap_values_action, shap_values_value, base_vectors, action_low, action_high)
         pygame.display.flip()
     # def render_frame(self, shap_values1, shap_values2, shap_values3, thrusters, n_d, alpha_d, u_hat, v_hat, r_hat, x_err, y_err, psi_err, explain_mode, base_vectors, explain_vector):
     #     s = sum(shap_values3)

@@ -151,6 +151,8 @@ def main():
     # Define models and environments
     model = PPO.load("/app/models/training_20250404_165037/models/best_model.zip")
     env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v4", render_mode='human', max_time_steps=200)
+    action_low = env.action_space.low
+    action_high = env.action_space.high
     obs2action_model = Obs2ActionWrapper(model)
     obs2value_model = Obs2ValueWrapper(model)
 
@@ -161,19 +163,23 @@ def main():
     num_random = 500
     random_obs = np.array([env.observation_space.sample() for _ in range(num_random)])
     random_obs = np.concatenate([random_obs, -random_obs])
+    print(random_obs)
     bakground_obs = random_obs
 
     #df = pd.read_csv("/app/samples/training_20250328_131443/samples.csv")
     #samples_obs = df.iloc[:,:].values
-    
+    samples_obs = np.array([[0,0,0,0,0,0,0,0,0,0,0,0,0,0]])
+    print(samples_obs)
+
     bakground_torch = torch.tensor(bakground_obs, dtype=torch.float32)
-    #samples_torch = torch.tensor(samples_obs, dtype=torch.float32)
+    samples_torch = torch.tensor(samples_obs, dtype=torch.float32)
 
     # SHAP explainers
     explainer_action = shap.DeepExplainer(obs2action_model, bakground_torch)
-    explainer_value = shap.DeepExplainer(obs2value_model, bakground_torch)
+    print(1)
+    explainer_value = shap.DeepExplainer(obs2value_model, samples_torch)
     #explainer_value = shap.DeepExplainer(obs2value_model, samples_torch)
-    base_vectors = [(explainer_action.expected_value[i]*900) for i in range(8)]
+    base_vectors = explainer_action.expected_value
     print("Base vectors:", base_vectors)
 
     # constraints
@@ -242,9 +248,15 @@ def main():
             shap_values_action = explainer_action.shap_values(obs_tensor)
             shap_values_value = explainer_value.shap_values(obs_tensor)
             
+            # print(shap_values_value)
+            # print('')
             # calculate render arguments
             shap_values_action_list = [arr.flatten().tolist() for arr in shap_values_action]
-            shap_values_value_list = [arr.flatten().tolist() for arr in shap_values_value]
+
+            shap_values_value_list = [arr.flatten().tolist() for arr in shap_values_value][0]
+            # print(shap_values_value_list)
+            # print('')
+            # print('')
             tot_thrust, tot_angle, tot_angular_thrust = combine_actuator_ref(actuator_ref, actuator_pos)
             x_tilde = obs[0] * max_distance
             y_tilde = obs[1] * max_distance
@@ -258,7 +270,7 @@ def main():
             try:
                 render.render_frame(
                     shap_values_action_list,
-                    shap_values_value,
+                    shap_values_value_list,
                     actuator_ref,
                     tot_thrust,
                     tot_angle,
@@ -269,7 +281,9 @@ def main():
                     u_hat,
                     v_hat,
                     r_hat,
-                    base_vectors
+                    base_vectors,
+                    action_low,
+                    action_high
                 )
             except pygame.error as e:
                 print("Pygame error during rendering:", e)
