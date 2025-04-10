@@ -149,8 +149,8 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
 
     # Define models and environments
-    model = PPO.load("/app/models/training_20250404_165037/models/PPO_20250405_034008_steps_155648_update_76.zip")
-    env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v5", render_mode='human', max_time_steps=200)
+    model = PPO.load("/app/models/training_20250404_165037/models/best_model.zip")
+    env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v4", render_mode='human', max_time_steps=200)
     obs2action_model = Obs2ActionWrapper(model)
     obs2value_model = Obs2ValueWrapper(model)
 
@@ -173,7 +173,8 @@ def main():
     explainer_action = shap.DeepExplainer(obs2action_model, bakground_torch)
     explainer_value = shap.DeepExplainer(obs2value_model, bakground_torch)
     #explainer_value = shap.DeepExplainer(obs2value_model, samples_torch)
-    
+    base_vectors = [(explainer_action.expected_value[i]*900) for i in range(8)]
+    print("Base vectors:", base_vectors)
 
     # constraints
     max_distance = 10
@@ -267,7 +268,8 @@ def main():
                     psi_tilde,
                     u_hat,
                     v_hat,
-                    r_hat
+                    r_hat,
+                    base_vectors
                 )
             except pygame.error as e:
                 print("Pygame error during rendering:", e)

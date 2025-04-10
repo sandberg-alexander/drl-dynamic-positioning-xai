@@ -1247,7 +1247,14 @@ class ShapExplainRender(VesselRender, Utilities):
         self.surface.blit(text_surface2, text_rect2)
         self.surface.blit(text_surface3, text_rect3)
 
-    def _draw_explaination4(self, shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat):
+    def _calculate_angular_thrust(self, rpm):
+        ang_thrust=0
+        for i, (x,y) in enumerate(self.actuator_pos):
+            ang_thrust += rpm[2*i] * y
+            ang_thrust += rpm[2*i+1] * x
+        return ang_thrust        
+
+    def _draw_explaination4(self, shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors):
         
 
         arr_RPM = np.array(shap_values_action)
@@ -1256,10 +1263,30 @@ class ShapExplainRender(VesselRender, Utilities):
         shap_feature_RPM = arr_RPM[:, self.idx] * 900
         #print(shap_feature_RPM)
         #print('')
+        base_x = sum(base_vectors[i*2] for i in range(len(base_vectors)//2))
+        base_y = sum(base_vectors[i+1*2] for i in range(len(base_vectors)//2))
+        base_vector = (np.sqrt(base_x**2 + base_y**2), np.arctan2(base_y, base_x), self._calculate_angular_thrust(base_vectors))
+        print(base_vector)
+        vec = np.zeros((len(shap_feature_RPM)//2,2))
+        for i in range(len(shap_feature_RPM)//2):
+            thr =  np.clip(np.sqrt(shap_feature_RPM[i*2]**2 + shap_feature_RPM[i*2+1]**2),0, 900)
+            ang = np.arctan2(shap_feature_RPM[i*2+1],shap_feature_RPM[i*2])*180/np.pi
+            vec[i] = (thr, ang)
+            
+
+
+        vector = self._add_vectors_polar(vec)
+        print(vector)
+        vector_base = self._add_vectors_polar(base_vector, vector)
+
         x = sum(shap_feature_RPM[i*2] for i in range(len(shap_feature_RPM)//2))
         y = sum(shap_feature_RPM[i*2+1] for i in range(len(shap_feature_RPM)//2))
         thrust = np.sqrt(x**2+y**2)
         angle = np.arctan2(y,x)
+        ang_thrust = self._calculate_angular_thrust(shap_feature_RPM)
+        #print(ang_thrust)
+
+
         # shap_feature_angles = arr_angles[:, self.idx] * 180
         # shap_tot_RPM = np.sum(arr_RPM, axis=1) * 1200
         # shap_tot_angles = np.sum(arr_angles, axis=1) * 180
@@ -1275,14 +1302,15 @@ class ShapExplainRender(VesselRender, Utilities):
         # _,_,moment = self._calculate_ad(thrusters)
 
 
-        # radius = 30
+        radius = 30
         # if self.explain_vector:
         #     # Angular RPMS for all SHAP features (estimate of total angular RPM)
         #     self._draw_curved_arrow(self._scalar2pygame(tot_vector_base[2])/(1200*radius), self.center, Color.PURPLE.value, radius=radius+10)
         #     # Total angular RPM
-        #     self._draw_curved_arrow(self._scalar2pygame(tot_angular_thrust)/radius, self.center, Color.VELOCITY_GREEN.value, radius=radius+10)
-        # self._draw_curved_arrow(self._scalar2pygame(main_feature_vector_base[2])/(1200*radius), self.center, Color.DESIRED_LIGHT_YELLOW.value, radius=radius, arrowhead_length=5, arrowhead_widht=5)
-              
+        self._draw_curved_arrow(self._scalar2pygame(tot_angular_thrust)/radius, self.center, Color.VELOCITY_GREEN.value, radius=radius+10)
+        self._draw_curved_arrow(np.clip(self._scalar2pygame(ang_thrust)/(900*radius),-2*np.pi,2*np.pi), self.center, Color.DESIRED_LIGHT_YELLOW.value, radius=radius, arrowhead_length=5, arrowhead_widht=5)
+        self._draw_curved_arrow(np.clip(self._scalar2pygame(vector[2])/(900*radius),-2*np.pi,2*np.pi), self.center, Color.RED.value, radius=radius, arrowhead_length=5, arrowhead_widht=5)
+        #print(self._scalar2pygame(ang_thrust)/(900*radius))      
         # Base vector
         #self._draw_arrow(self._degrees2pygame(base_vector[1]), self._scalar2pygame(base_vector[0]/1200), Color.BLACK.value, self.center)
         
@@ -1297,12 +1325,14 @@ class ShapExplainRender(VesselRender, Utilities):
         #     # Thruster vector for all SHAP features (estimate of totalt thruster vector)
         #     self._draw_arrow(self._degrees2pygame(tot_vector_base[1]), self._scalar2pygame(tot_vector_base[0]/1200), Color.PURPLE.value, self.center)
         #     # Total thruster vector
-        #    self._draw_arrow(self._degrees2pygame(tot_angle), self._scalar2pygame(tot_thrust), Color.VELOCITY_GREEN.value, self.center)
+        self._draw_arrow(self._degrees2pygame(tot_angle), self._scalar2pygame(tot_thrust), Color.VELOCITY_GREEN.value, self.center)
         
         # Thruster vector from base for single SHAP feature
         #self._draw_arrow(self._degrees2pygame(main_feature_vector[1]), self._scalar2pygame(main_feature_vector[0]/1200), Color.DESIRED_LIGHT_YELLOW.value, (self.center[0]+y1,self.center[1]-x1))
         # self._draw_arrow(self._degrees2pygame(main_feature_vector_base[1]), self._scalar2pygame(main_feature_vector_base[0]/1200), Color.DESIRED_LIGHT_YELLOW.value, self.center, arrowhead_width=5, arrowhead_length=5)
         self._draw_arrow(self._degrees2pygame(angle*180/np.pi), self._scalar2pygame(thrust/900), Color.DESIRED_LIGHT_YELLOW.value, (self.center[0],self.center[1]))
+        self._draw_arrow(self._degrees2pygame(vector[1]), self._scalar2pygame(vector[0]/900), Color.RED.value, (self.center[0],self.center[1]))
+        self._draw_arrow(self._degrees2pygame(vector_base[1]), self._scalar2pygame(vector_base[0]/900), Color.PURPLE.value, (self.center[0],self.center[1]))
 
 
 
@@ -1314,16 +1344,16 @@ class ShapExplainRender(VesselRender, Utilities):
             self._draw_angle(self.surface, self.center, np.deg2rad(psi_tilde), Color.RED.value, radius=self._scalar2pygame(self.VESSEL_LENGTH/2)+self.explain_offset, label=f"{psi_tilde:.0f} °")
         elif self.idx == 3:
             if u_hat > 0:
-                self._draw_arrow(self._degrees2pygame(0), self._scalar2pygame(u_hat), Color.RED.value, (self.center[0],self.center[1]-self._scalar2pygame(self.VESSEL_LENGTH/2)-self.explain_offset), show_measurement=True, label=f"{u_hat:.2f} m/s")
+                self._draw_arrow(self._degrees2pygame(0), self._scalar2pygame(u_hat), Color.RED.value, (self.center[0],self.center[1]-self._scalar2pygame(self.VESSEL_LENGTH/2)-self.explain_offset), show_measurement=True, label=f"{u_hat/2:.2f} m/s")
             else:
-                self._draw_arrow(self._degrees2pygame(0), self._scalar2pygame(u_hat), Color.RED.value, (self.center[0],self.center[1]+self._scalar2pygame(self.VESSEL_LENGTH/2)+self.explain_offset), show_measurement=True, label=f"{u_hat:.2f} m/s")
+                self._draw_arrow(self._degrees2pygame(0), self._scalar2pygame(u_hat), Color.RED.value, (self.center[0],self.center[1]+self._scalar2pygame(self.VESSEL_LENGTH/2)+self.explain_offset), show_measurement=True, label=f"{u_hat/2:.2f} m/s")
         elif self.idx == 4:
             if v_hat > 0:
-                self._draw_arrow(self._degrees2pygame(90), self._scalar2pygame(v_hat), Color.RED.value, (self.center[0]+self._scalar2pygame(self.VESSEL_WIDTH/2)+self.explain_offset, self.center[1]), show_measurement=True, label=f"{v_hat:.2f} m/s")
+                self._draw_arrow(self._degrees2pygame(90), self._scalar2pygame(v_hat), Color.RED.value, (self.center[0]+self._scalar2pygame(self.VESSEL_WIDTH/2)+self.explain_offset, self.center[1]), show_measurement=True, label=f"{v_hat/2:.2f} m/s")
             else:
-                self._draw_arrow(self._degrees2pygame(90), self._scalar2pygame(v_hat), Color.RED.value, (self.center[0]-self._scalar2pygame(self.VESSEL_WIDTH/2)-self.explain_offset,self.center[1]), show_measurement=True, label=f"{v_hat:.2f} m/s")
+                self._draw_arrow(self._degrees2pygame(90), self._scalar2pygame(v_hat), Color.RED.value, (self.center[0]-self._scalar2pygame(self.VESSEL_WIDTH/2)-self.explain_offset,self.center[1]), show_measurement=True, label=f"{v_hat/2:.2f} m/s")
         elif self.idx == 5:
-            self._draw_curved_arrow(np.deg2rad(r_hat), self.center, Color.RED.value, radius=self._scalar2pygame(self.VESSEL_LENGTH/2)+self.explain_offset, show_measurement=True, label=f"{r_hat:.0f} °/s")
+            self._draw_curved_arrow(np.deg2rad(r_hat), self.center, Color.RED.value, radius=self._scalar2pygame(self.VESSEL_LENGTH/2)+self.explain_offset, show_measurement=True, label=f"{r_hat*112.6/(360*2):.0f} °/s")
 
         # error = np.array([tot_thrust*1200, tot_angle, tot_angular_thrust*1200]) - np.array([tot_vector_base[0], tot_vector_base[1], tot_vector_base[2]])
 
@@ -1481,7 +1511,7 @@ class ShapExplainRender(VesselRender, Utilities):
         self.surface.blit(text_surface3, text_rect3)
 
 
-    def render(self, shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat):
+    def render(self, shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors):
         #print(1)
         # #self._find_explaination(shap_values_EV, n=1, list_in_list=False)
         # if explain_mode != self.explain_mode:
@@ -1518,7 +1548,7 @@ class ShapExplainRender(VesselRender, Utilities):
         #print(5)
         #self._draw_explaination(shap_values_EV, shap_values_RPM, thrusters, y_err, x_err, psi_err, u_hat, v_hat, r_hat)
         #self._draw_explaination2(y_err, x_err, psi_err, u_hat, v_hat, r_hat, shap_values_RPM, shap_values_angles, base_vectors, n_d, alpha_d, thrusters)
-        self._draw_explaination4(shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat)
+        self._draw_explaination4(shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors)
         #print(6)
         self.draw_legend(self.legend_surface, self.box_pos)
         #print(7)
@@ -1776,11 +1806,11 @@ class RenderExplaination():
 
 
 
-    def render_frame(self, shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat):
+    def render_frame(self, shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors):
         self._screen.fill(Color.SCREEN_COLOR.value)
         self._body_window.render(actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat)
         self._ned_window.render(x_tilde, y_tilde, psi_tilde)
-        self._shap_explain_window.render(shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat)
+        self._shap_explain_window.render(shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors)
 
         #self._shap_window_top.render(shap_values_action, shap_values_value)
         pygame.display.flip()

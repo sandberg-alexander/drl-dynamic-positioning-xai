@@ -21,8 +21,8 @@ def main():
     Starting DRL training in clean environment ...
     """)
 
-    model = PPO.load("/app/models/training_20250404_165037/models/PPO_20250405_034008_steps_155648_update_76.zip")
-    env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v4", render_mode='human', max_time_steps=1000)
+    model = PPO.load("/app/models/training_20250404_165037/models/best_model.zip")
+    env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v4", render_mode='human', max_time_steps=250)
     model.set_env(env)
     
     pub_obs_act_ref_pair = rospy.Publisher('/drl/observation_actuator_ref_pair', ObservationActuatorRefPair, queue_size=1)
