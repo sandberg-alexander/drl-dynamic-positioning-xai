@@ -29,3 +29,16 @@ register(
     id="milliAmpere1ROS_env/MilliAmpere1ROS-v5",
     entry_point="milliAmpere1ROS_env.envs:MilliAmpere1RosEnvV5",
 )
+register(
+    id="milliAmpere1ROS_env/MilliAmpere1ROS-v6",
+    entry_point="milliAmpere1ROS_env.envs:MilliAmpere1RosEnvV6",
+)
+register(
+    id="milliAmpere1ROS_env/MilliAmpere1ROS-v7",
+    entry_point="milliAmpere1ROS_env.envs:MilliAmpere1RosEnvV7",
+)
+register(
+    id="milliAmpere1ROS_env/MilliAmpere1ROS-v8",
+    entry_point="milliAmpere1ROS_env.envs:MilliAmpere1RosEnvV8",
+)
+

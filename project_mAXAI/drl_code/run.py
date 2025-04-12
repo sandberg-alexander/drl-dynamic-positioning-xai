@@ -22,13 +22,13 @@ def main():
     """)
 
     model = PPO.load("/app/models/training_20250404_165037/models/best_model.zip")
-    env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v4", render_mode='human', max_time_steps=250)
+    env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v6", render_mode='human', max_time_steps=1000000)
     model.set_env(env)
     
     pub_obs_act_ref_pair = rospy.Publisher('/drl/observation_actuator_ref_pair', ObservationActuatorRefPair, queue_size=1)
     obs_act_ref_pair = ObservationActuatorRefPair()
-
-    observation, info = env.reset(seed=42)
+    seed=43
+    observation, info = env.reset(seed=seed)
     i=0
     while True:
         i+=1
@@ -76,7 +76,7 @@ def main():
         observation=observation_next
 
         if terminated or truncated:
-            observation, info = env.reset(seed=42+i)
+            observation, info = env.reset(seed=seed+i)
 
 if __name__ == '__main__':
     main()
