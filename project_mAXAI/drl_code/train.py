@@ -81,7 +81,7 @@ def main():
     
     # Create and monitor the environment
     # Make sure the environment ID matches exactly what's registered
-    env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v4", render_mode='human', max_time_steps=1000)
+    env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v9", render_mode='human', max_time_steps=1000)
     
     # Monitor with logs in the run-specific directory
     env = Monitor(env, filename=f"{logs_dir}")

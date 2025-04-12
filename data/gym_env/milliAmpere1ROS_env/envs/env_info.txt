@@ -18,3 +18,7 @@ milliampere_ros_v4.py
 milliampere_ros_v5.py
     decomposed vector action space with reset service and with termination penelty
     and has only positive thrust
+
+milliampere_ros_v9.py
+    decomposed vector action space without reset service and with termination penelty
+    and has only positive thrust and penelty for changeing angles.

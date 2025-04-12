@@ -1,4 +1,4 @@
 env/
 __pycache__/
-drl_code/milliAmpere1ROS_env/
-xai_code/milliAmpere1ROS_env
+project_mAXAI/drl_code/milliAmpere1ROS_env/
+project_mAXAI/xai_code/milliAmpere1ROS_env/

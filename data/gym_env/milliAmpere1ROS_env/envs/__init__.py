@@ -7,3 +7,4 @@ from milliAmpere1ROS_env.envs.milliampere1_ros_v5 import MilliAmpere1RosEnvV5
 from milliAmpere1ROS_env.envs.milliampere1_ros_v6 import MilliAmpere1RosEnvV6
 from milliAmpere1ROS_env.envs.milliampere1_ros_v7 import MilliAmpere1RosEnvV7
 from milliAmpere1ROS_env.envs.milliampere1_ros_v8 import MilliAmpere1RosEnvV8
+from milliAmpere1ROS_env.envs.milliampere1_ros_v9 import MilliAmpere1RosEnvV9
