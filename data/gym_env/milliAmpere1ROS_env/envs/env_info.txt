@@ -22,3 +22,9 @@ milliampere_ros_v5.py
 milliampere_ros_v9.py
     decomposed vector action space without reset service and with termination penelty
     and has only positive thrust and penelty for changeing angles.
+
+milliampere_ros_v10.py
+    decomposed vector action space without reset service and with termination penelty
+    and has only positive thrust and penelty for changeing angles. Also has waypoint
+    defined target and only works in drl mode
+    
