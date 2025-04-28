@@ -19,6 +19,7 @@ class Agent():
     def __init__(self):
         self.obs = None
         self.action = None
+        self.target_heading = None
 
         #rospy.init_node('xai', anonymous=True)
         rospy.Subscriber('drl/observation_actuator_ref_pair', ObservationActuatorRefPair, self._callback)
@@ -47,12 +48,18 @@ class Agent():
             (data.n_d3/900, data.alpha_d3),
             (data.n_d4/900, data.alpha_d4),
         ]
+    
+        self.target_heading = data.target_heading
+
 
     def get_observations(self):
         return self.obs
     
     def get_actuator_ref(self):
         return self.actuator_ref
+    
+    def get_target_heading(self):
+        return self.target_heading
     
 class Obs2ActionWrapper(torch.nn.Module):
     def __init__(self, model):
@@ -229,6 +236,9 @@ def main():
             #     actions.n_x4d, actions.n_y4d
             # ]
 
+            # get target heading
+            target_heading = agent.get_target_heading()
+
             # get actuator ref
             actuator_ref = agent.get_actuator_ref()
             while actuator_ref is None:
@@ -283,7 +293,8 @@ def main():
                     r_hat,
                     base_vectors,
                     action_low,
-                    action_high
+                    action_high,
+                    target_heading
                 )
             except pygame.error as e:
                 print("Pygame error during rendering:", e)

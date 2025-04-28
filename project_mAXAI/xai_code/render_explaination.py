@@ -466,11 +466,11 @@ class VesselRender(Window):
 
     def draw_target(self, x_err, y_err, psi_err, ned=False, color=Color.DESIRED_YELLOW.value):
         if ned:
-            shape = self._transform_vessel(0, 0, 45, self.shape)
+            shape = self._transform_vessel(0, 0, psi_err, self.shape)
             #shape = self.shape
             circle = self.circle_point
             #triangle = self.triangle_shape
-            triangle = self._transform_vessel(0, 0, 45, self.triangle_shape)
+            triangle = self._transform_vessel(0, 0, psi_err, self.triangle_shape)
 
         else:
             shape = self._transform_vessel(x_err, y_err, psi_err, self.shape)
@@ -666,14 +666,14 @@ class NedRender(VesselRender):
     def __init__(self, screen, window_pos, title="NED-frame", window_width=450, window_height=450):
         super().__init__(screen, window_pos, self.SCALE, title, window_width, window_height)
     
-    def render(self, x_err, y_err, psi_err):
+    def render(self, x_err, y_err, psi_err, target_heading):
         # init
         self.render_surface()
         
         # NED render
         self.surface.fill(Color.OCEAN_BLUE.value)
-        self.draw_target(x_err, y_err, psi_err, ned=True)
-        self.draw_vessel(x_err, y_err, psi_err-45, ned=True)
+        self.draw_target(x_err, y_err, target_heading, ned=True)
+        self.draw_vessel(x_err, y_err, psi_err-target_heading, ned=True)
 
         # final render
         self.render_surface_title()
@@ -1919,10 +1919,10 @@ class RenderExplaination():
 
 
 
-    def render_frame(self, shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors, action_low, action_high):
+    def render_frame(self, shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors, action_low, action_high, target_heading):
         self._screen.fill(Color.SCREEN_COLOR.value)
         self._body_window.render(actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat)
-        self._ned_window.render(x_tilde, y_tilde, psi_tilde)
+        self._ned_window.render(x_tilde, y_tilde, psi_tilde, target_heading)
         self._shap_explain_window.render(shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors, action_low, action_high)
 
         self._shap_window_top.render(shap_values_action, shap_values_value, base_vectors, action_low, action_high)

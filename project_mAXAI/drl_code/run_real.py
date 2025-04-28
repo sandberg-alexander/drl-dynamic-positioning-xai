@@ -47,6 +47,7 @@ def main():
         observation_next, reward, terminated, truncated, info = env.step(action)
         current_thrusters = env.thrusters
         current_angles = env.angles
+        target_heading = env.target_pose[2]
 
         obs_act_ref_pair.x_tilde = observation[0]
         obs_act_ref_pair.y_tilde = observation[1]
@@ -70,6 +71,7 @@ def main():
         obs_act_ref_pair.alpha_d3 = current_angles[2]
         obs_act_ref_pair.n_d4 = current_thrusters[3]
         obs_act_ref_pair.alpha_d4 = current_angles[3]
+        obs_act_ref_pair.target_heading = target_heading
 
         pub_obs_act_ref_pair.publish(obs_act_ref_pair)
 
