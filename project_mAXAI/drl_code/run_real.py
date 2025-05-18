@@ -24,6 +24,8 @@ def main():
     model = PPO.load("/app/models/training_20250404_165037/models/best_model.zip")
     env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v10", render_mode='human', max_time_steps=1000000)
     model.set_env(env)
+    print("model.policy:")
+    print(model.policy)
     
     pub_obs_act_ref_pair = rospy.Publisher('/drl/observation_actuator_ref_pair', ObservationActuatorRefPair, queue_size=1)
     obs_act_ref_pair = ObservationActuatorRefPair()

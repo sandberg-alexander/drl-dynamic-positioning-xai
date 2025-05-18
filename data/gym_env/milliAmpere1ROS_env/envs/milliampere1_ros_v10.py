@@ -9,6 +9,7 @@ import rospy
 from scipy.spatial.transform import Rotation
 import pygame
 import math
+import time
 
 from geometry_msgs.msg import PoseStamped
 from custom_msgs.msg import ActuatorSetpoints, NorthEastHeading
@@ -204,6 +205,9 @@ class MilliAmpere1RosEnvV10(gym.Env):
         self._pub_actuator_inputs()
 
         observation = self._get_obs()
+        self.start_time=time.perf_counter()
+        self.start_time2=0
+        self.end_time2=0
         normalized_observation = self._get_norm_obs(observation)
         info = self._get_info()
 
@@ -226,6 +230,8 @@ class MilliAmpere1RosEnvV10(gym.Env):
         self.action = action.copy()*self.max_thruster_rpm
         self._calculate_actuator_inputs(action)
         self._pub_actuator_inputs()
+        self.end_time = time.perf_counter()
+        print(f"{self.end_time-self.start_time} s, {self.end_time2-self.start_time2} s")
 
         if self.waypoint_data is not None:
             self.target_pose = np.array([self.waypoint_data.north, self.waypoint_data.east, self.waypoint_data.heading*180/np.pi])
@@ -233,13 +239,17 @@ class MilliAmpere1RosEnvV10(gym.Env):
         # Sleep to collect observations from ROS node
         rospy.sleep(self.sleep_time)                    ##### SHOULD I REMOVE?
 
+        self.start_time = time.perf_counter()
         observation = self._get_obs()
         normalized_observation = self._get_norm_obs(observation)
         terminated = self._is_terminated()
         truncated = self._is_truncated()
         reward = self._get_reward()
         info = self._get_info()
-        self.render()
+        self.start_time2 = time.perf_counter()
+        rospy.sleep(0.16)
+        #self.render()
+        self.end_time2 = time.perf_counter()
 
         return normalized_observation, reward, terminated, truncated, info
 
