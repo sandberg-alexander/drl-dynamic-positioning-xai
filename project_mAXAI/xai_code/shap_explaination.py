@@ -216,6 +216,7 @@ def main():
     # MAIN LOOP
     try:
         while not rospy.is_shutdown():
+            start=time.perf_counter()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     print("event quit")
@@ -304,6 +305,8 @@ def main():
                 rospy.sleep(sleep_time)
             except rospy.ROSInterruptException:
                 break
+            end=time.perf_counter()
+            print(f"{end-start} s")
     
     except Exception as e:
         print(f"Exception in main loop: {e}")
