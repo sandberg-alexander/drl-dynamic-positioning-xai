@@ -9,10 +9,11 @@ import signal
 import sys
 import numpy as np
 import math
+import glob
 import gymnasium as gym
 from stable_baselines3 import PPO
 from render_explaination import RenderExplaination
-from custom_ros_msgs.msg import ObservationActuatorRefPair
+from custom_ros_msgs.msg import ObservationActuatorRefPair, Mode
 import milliAmpere1ROS_env
 
 class Agent():
@@ -20,9 +21,23 @@ class Agent():
         self.obs = None
         self.action = None
         self.target_heading = None
+        self.mode_flag = 0
+
+        self.pub_mode = rospy.Publisher(
+            '/drl/mode',
+            Mode,
+            queue_size=1
+        )
+        self.mode_msg = Mode()
 
         #rospy.init_node('xai', anonymous=True)
         rospy.Subscriber('drl/observation_actuator_ref_pair', ObservationActuatorRefPair, self._callback)
+        rospy.Subscriber('/drl/mode', Mode, self._mode_callback)
+
+    def _mode_callback(self, msg: Mode):
+        """Update mode_flag from incoming Mode message."""
+        self.mode_flag = msg.mode
+        
 
     def _callback(self, data):
         self.obs = [
@@ -222,6 +237,48 @@ def main():
                     print("event quit")
                     rospy.signal_shutdown("User closed window")
                 # Keyboard defined inputs
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_5:
+                        agent.mode_msg.mode = 5
+                        agent.mode_flag = 5
+                        agent.pub_mode.publish(agent.mode_msg)
+                    elif event.key == pygame.K_4:
+                        agent.mode_msg.mode = 4
+                        agent.mode_flag = 4
+                        agent.pub_mode.publish(agent.mode_msg)
+                    elif event.key == pygame.K_3:
+                        agent.mode_msg.mode = 3
+                        agent.mode_flag = 3
+                        agent.pub_mode.publish(agent.mode_msg)
+                    elif event.key == pygame.K_2:
+                        agent.mode_msg.mode = 2
+                        agent.mode_flag = 2
+                        agent.pub_mode.publish(agent.mode_msg)
+                    elif event.key == pygame.K_1:
+                        agent.mode_msg.mode = 1
+                        agent.mode_flag = 1
+                        agent.pub_mode.publish(agent.mode_msg)
+                    elif event.key == pygame.K_0:
+                        agent.mode_msg.mode = 0
+                        agent.mode_flag = 0
+                        agent.pub_mode.publish(agent.mode_msg)
+            
+            if agent.mode_msg.mode == 5 and agent.mode_flag == 0:
+                print(1)
+                latest = max(glob.glob("/app/xai_samples/value_function/sample_*.csv"), key=os.path.getmtime)
+                print(2)
+                df = pd.read_csv(latest)
+                print(3)
+                samples_obs = df.iloc[:,:].values
+                print(4)
+                samples_torch = torch.tensor(samples_obs, dtype=torch.float32)
+                print(5)
+                print(samples_torch.shape)
+                print(samples_torch)
+                explainer_value = shap.DeepExplainer(obs2value_model, samples_torch)
+                print(6)
+                agent.mode_msg.mode = 0
+                print(7)
             
             # # get actions
             # actions = agent.get_actions()

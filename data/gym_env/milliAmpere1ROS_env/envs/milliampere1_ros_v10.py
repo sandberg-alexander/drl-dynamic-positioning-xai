@@ -38,7 +38,7 @@ class MilliAmpere1RosEnvV10(gym.Env):
         self.observation_space = spaces.Box(low=low_obs, high=high_obs, dtype=float)
 
         # ROS publishers and subscribers
-        rospy.init_node('ros_vessel_env', anonymous=True)
+        #rospy.init_node('ros_vessel_env', anonymous=True)
         self.pub_act_ref_1 = rospy.Publisher('/actuator_ref_1', ActuatorSetpoints, queue_size=1)
         self.pub_act_ref_2 = rospy.Publisher('/actuator_ref_2', ActuatorSetpoints, queue_size=1)
         self.pub_act_ref_3 = rospy.Publisher('/actuator_ref_3', ActuatorSetpoints, queue_size=1)
@@ -205,9 +205,9 @@ class MilliAmpere1RosEnvV10(gym.Env):
         self._pub_actuator_inputs()
 
         observation = self._get_obs()
-        self.start_time=time.perf_counter()
-        self.start_time2=0
-        self.end_time2=0
+        #self.start_time=time.perf_counter()
+        #self.start_time2=0
+        #self.end_time2=0
         normalized_observation = self._get_norm_obs(observation)
         info = self._get_info()
 
@@ -230,8 +230,8 @@ class MilliAmpere1RosEnvV10(gym.Env):
         self.action = action.copy()*self.max_thruster_rpm
         self._calculate_actuator_inputs(action)
         self._pub_actuator_inputs()
-        self.end_time = time.perf_counter()
-        print(f"{self.end_time-self.start_time} s, {self.end_time2-self.start_time2} s")
+        #self.end_time = time.perf_counter()
+        #print(f"{self.end_time-self.start_time} s, {self.end_time2-self.start_time2} s")
 
         if self.waypoint_data is not None:
             self.target_pose = np.array([self.waypoint_data.north, self.waypoint_data.east, self.waypoint_data.heading*180/np.pi])
@@ -239,17 +239,17 @@ class MilliAmpere1RosEnvV10(gym.Env):
         # Sleep to collect observations from ROS node
         rospy.sleep(self.sleep_time)                    ##### SHOULD I REMOVE?
 
-        self.start_time = time.perf_counter()
+        #self.start_time = time.perf_counter()
         observation = self._get_obs()
         normalized_observation = self._get_norm_obs(observation)
         terminated = self._is_terminated()
         truncated = self._is_truncated()
         reward = self._get_reward()
         info = self._get_info()
-        self.start_time2 = time.perf_counter()
+        #self.start_time2 = time.perf_counter()
         rospy.sleep(0.16)
         #self.render()
-        self.end_time2 = time.perf_counter()
+        #self.end_time2 = time.perf_counter()
 
         return normalized_observation, reward, terminated, truncated, info
 

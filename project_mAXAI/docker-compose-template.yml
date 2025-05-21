@@ -29,7 +29,8 @@ services:
       - ../local_env/plots/drl:/app/plots:rw
       - ../data/models:/app/models:rw
       - ../data/gym_env:/app/gym_env:rw
-      - ../data/samples:/app/samples:rw
+      - ../data/xai_samples:/app/xai_samples:rw
+      - ../data/runs:/app/runs:rw
       - ./drl_code:/app/drl_code:rw
     command: >
       bash -c '
@@ -66,7 +67,8 @@ services:
       - ../local_env/plots/xai:/app/plots:rw
       - ../data/models:/app/models:rw
       - ../data/gym_env:/app/gym_env:rw
-      - ../data/samples:/app/samples:rw
+      - ../data/xai_samples:/app/xai_samples:rw
+      - ../data/runs:/app/runs:rw
       - ./xai_code:/app/xai_code:rw
     command: >
       bash -c '
