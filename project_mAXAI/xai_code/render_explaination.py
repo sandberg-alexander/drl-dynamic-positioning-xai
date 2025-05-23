@@ -1993,14 +1993,14 @@ class ShapRender(Window):
             'ûₜ [m/s]',
             'v̂ₜ [m/s]',
             'r̂ₜ [°/s]',
-            'n_{x1d,ₜ₋₁} [RPM]',
-            'n_{y1d,ₜ₋₁} [RPM]',
-            'n_{x2d,ₜ₋₁} [RPM]',
-            'n_{y2d,ₜ₋₁} [RPM]',
-            'n_{x3d,ₜ₋₁} [RPM]',
-            'n_{y3d,ₜ₋₁} [RPM]',
-            'n_{x4d,ₜ₋₁} [RPM]',
-            'n_{y4d,ₜ₋₁} [RPM]'
+            'n_{ₓ₁,d,ₜ₋₁} [RPM]',
+            'n_{ᵧ₁,d,ₜ₋₁} [RPM]',
+            'n_{ₓ₂,d,ₜ₋₁} [RPM]',
+            'n_{ᵧ₂,d,ₜ₋₁} [RPM]',
+            'n_{ₓ₃,d,ₜ₋₁} [RPM]',
+            'n_{ᵧ₃,d,ₜ₋₁} [RPM]',
+            'n_{ₓ₄,d,ₜ₋₁} [RPM]',
+            'n_{ᵧ₄,d,ₜ₋₁} [RPM]'
         ]
         self.feature_names_full = self.feature_names[:]      # <- new
 
@@ -2046,7 +2046,7 @@ class ShapRender(Window):
         for tick in range(self.num_ticks):
             tick_value = tick * self.increment
             self.ticks_px[tick] = self.window_padding / 2 + self.axis_padding_width + self._shap_value_2_pixels(tick_value)
-            self.tick_label[tick] = self.label_font.render(f"{tick_value:.2f}", self.antialias, Color.BLACK.value)
+            self.tick_label[tick] = self.label_font.render(f"{tick_value*900}", self.antialias, Color.BLACK.value)
             self.tick_rect[tick] = self.tick_label[tick].get_rect()
             self.tick_rect[tick].midbottom = (self.ticks_px[tick], self.bottom_text_rect.midtop[1] - 5)
         
@@ -2314,12 +2314,10 @@ class RenderExplaination():
         pygame.display.set_caption(self.TITLE)
 
         self.shap_legend_items1 = (
-            "n_{d₁,ₜ} [RPM]",
-            "n_{d₂,ₜ} [RPM]",
-            "n_{d₃,ₜ} [RPM]",
-            "n_{d₄,ₜ} [RPM]",
-            "+ estimated value",
-            "- estimated value"
+            "n_{₁,d,ₜ} [RPM]",
+            "n_{₂,d,ₜ} [RPM]",
+            "n_{₃,d,ₜ} [RPM]",
+            "n_{₄,d,ₜ} [RPM]",
         )
         
         self.shap_legend_items2 = (

@@ -8,12 +8,12 @@ from numpy import radians as rad
 from matplotlib.lines import Line2D
 import time
 
-df = pd.read_csv("../data/runs/sim/data_test_north_20250521_085429.csv")
+df = pd.read_csv("../data/runs/sim/data_test_dp_20250523_152609.csv")
 
 scale = 10/6.4
 render_start = 0
 render_end = 200*5
-run_number = 5
+run_number = 6
 
 x = df['x']*10
 y = df['y']*10
@@ -63,16 +63,18 @@ def mark_episode(render_start, render_end, ax):
         # Flip the flag for the next iteration
         flag = not flag
 
-
+x_d = [0]*200 + [4]*400 + [0]*400
+y_d = [0]*400 + [4]*200 + [0]*400
+psi_d = [0]*800 + [180]*200
 
 # X
 fig, ax = plt.subplots(figsize=(10,4.8))
-
-ax.axhline(y=0, color='red', linestyle='--', linewidth=1.5*scale,label=f"Set point (y={0})")
-ax.plot(dt[render_start:render_end],x[render_start:render_end], linewidth=1.5*scale, color='black')
+ax.plot(x_d, color='red', linestyle='--', linewidth=1.5*scale, label='Desired position')
+#ax.axhline(y=0, color='red', linestyle='--', linewidth=1.5*scale,label=f"Set point (y={0})")
+ax.plot(dt[render_start:render_end],x_d-x[render_start:render_end], linewidth=1.5*scale, color='black', label='Real position (simulator)')
 ax.legend(fontsize=10*scale)
 ax.set_xlabel(r'time step [dt]', fontsize=14*scale)
-ax.set_ylabel(r'$\tilde{x}^b_t$ [m]', fontsize=14*scale)
+ax.set_ylabel(r'$x^n_t$ [m]', fontsize=14*scale)
 ax.tick_params(axis='x', labelsize=10*scale)
 ax.tick_params(axis='y', labelsize=10*scale)
 mark_episode(render_start, render_end, ax)
@@ -84,11 +86,13 @@ plt.close(fig)
 # Y
 fig, ax = plt.subplots(figsize=(10,4.8))
 
-ax.axhline(y=0, color='red', linestyle='--', linewidth=1.5*scale,label=f"Set point (y={0})")
-ax.plot(dt[render_start:render_end],y[render_start:render_end], linewidth=1.5*scale, color='black')
+#ax.axhline(y=0, color='red', linestyle='--', linewidth=1.5*scale,label=f"Set point (y={0})")
+ax.plot(y_d, color='red', linestyle='--', linewidth=1.5*scale, label='Desired trajectory')
+
+ax.plot(dt[render_start:render_end],y_d-y[render_start:render_end], linewidth=1.5*scale, color='black')
 ax.legend(fontsize=10*scale)
 ax.set_xlabel(r'time step [dt]', fontsize=14*scale)
-ax.set_ylabel(r'$\tilde{y}^b_t$ [m]', fontsize=14*scale)
+ax.set_ylabel(r'$y^n_t$ [m]', fontsize=14*scale)
 ax.tick_params(axis='x', labelsize=10*scale)
 ax.tick_params(axis='y', labelsize=10*scale)
 mark_episode(render_start, render_end, ax)
@@ -100,12 +104,13 @@ plt.close(fig)
 
 # psi
 fig, ax = plt.subplots(figsize=(10,4.8))
+ax.plot(psi_d, color='red', linestyle='--', linewidth=1.5*scale, label='Desired trajectory')
 
-ax.axhline(y=0, color='red', linestyle='--', linewidth=1.5*scale,label=f"Set point (y={0})")
-ax.plot(dt[render_start:render_end],psi[render_start:render_end], linewidth=1.5*scale, color='black')
+#ax.axhline(y=0, color='red', linestyle='--', linewidth=1.5*scale,label=f"Set point (y={0})")
+ax.plot(dt[render_start:render_end],psi_d-psi[render_start:render_end], linewidth=1.5*scale, color='black')
 ax.legend(fontsize=10*scale)
 ax.set_xlabel(r'time step [dt]', fontsize=14*scale)
-ax.set_ylabel(r'$\tilde{\psi}_t$ [$^\circ$]', fontsize=14*scale)
+ax.set_ylabel(r'$\psi_t$ [$^\circ$]', fontsize=14*scale)
 ax.tick_params(axis='x', labelsize=10*scale)
 ax.tick_params(axis='y', labelsize=10*scale)
 mark_episode(render_start, render_end, ax)

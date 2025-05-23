@@ -378,7 +378,7 @@ def main():
             except rospy.ROSInterruptException:
                 break
             end=time.perf_counter()
-            print(f"{end-start} s")
+            #print(f"{end-start} s")
     
     except Exception as e:
         print(f"Exception in main loop: {e}")
