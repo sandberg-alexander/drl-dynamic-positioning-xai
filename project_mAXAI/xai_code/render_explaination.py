@@ -902,7 +902,7 @@ class ShapExplainRender(VesselRender, Utilities):
     ACTUATOR_Y = 0.8
     VESSEL_MOMENT_MARKER = 50/SCALE
 
-    def __init__(self, screen, window_pos, title="Desired total trust force/moment explained BODY-frame", window_width=450, window_height=450):
+    def __init__(self, screen, window_pos, title="Desired total trust force/moment explained in BODY-frame", window_width=450, window_height=450):
         VesselRender.__init__(self, screen, window_pos, self.SCALE, title, window_width, window_height)
         Utilities.__init__(self)
 
@@ -1977,7 +1977,7 @@ class ShapRender(Window):
         self.max_shap_value = 4
         self.increment = 1
 
-        self.bar_gap = 50 # pixels
+        self.bar_gap = 25 # pixels
         self.label_offset = 10 # pixels
         self.label_surface = [None] * 14
         self.label_rect = [None] * 14
@@ -2331,7 +2331,7 @@ class RenderExplaination():
         self._body_window = BodyRender(self._screen, window_pos=(25,500))
         self._shap_window_top = ShapRender(self._screen, window_pos=(500,25),
                                            legend_items=self.shap_legend_items1,
-                                           title="SHAP-values thrust")
+                                           title="Feature importance using thrust SHAP-values")
         self._shap_window_bottom = ShapRender(self._screen, window_pos=(500,500),
                                               legend_items=self.shap_legend_items2,
                                               title="SHAP-values azimuth angles", window_width=475)
@@ -2339,13 +2339,20 @@ class RenderExplaination():
         self._shap_explain_window = ShapExplainRender(self._screen, window_pos=(500,500))
 
 
+        self.window_font = pygame.font.SysFont('DejaVu Sans', 11)
 
-    def render_frame(self, shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors, action_low, action_high, target_pose):
+    def render_frame(self, shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors, action_low, action_high, target_pose, time_step, time):
         #print(sum(shap_values_value))
         if sum(shap_values_value) < -2:
             self._screen.fill(Color.RED.value)
         else:
             self._screen.fill(Color.SCREEN_COLOR.value)
+
+        text_surface = self.window_font.render(f"time step: {int(time_step)}, time: {time} s", True, Color.BLACK.value)
+        text_rect = text_surface.get_rect()
+        text_rect.center = (self.SCREEN_WIDTH/2, self.SCREEN_HEIGHT-15)
+        self._screen.blit(text_surface, text_rect)
+
         self._body_window.render(actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, target_pose)
         self._ned_window.render(x_tilde, y_tilde, psi_tilde, target_pose)
         self._shap_explain_window.render(shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors, action_low, action_high)

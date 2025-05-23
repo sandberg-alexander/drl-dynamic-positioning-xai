@@ -323,6 +323,7 @@ class DRLDeployer:
         self.obs_act_msg.target_x = self.env.unwrapped.target_pose[0]
         self.obs_act_msg.target_y = self.env.unwrapped.target_pose[1]
         self.obs_act_msg.target_heading = self.env.unwrapped.target_pose[2]
+        self.obs_act_msg.time_step = self.time_step
         self.pub_obs_act.publish(self.obs_act_msg)
 
     def _log_data(self):

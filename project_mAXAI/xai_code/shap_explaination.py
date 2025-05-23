@@ -30,6 +30,8 @@ class Agent():
             queue_size=1
         )
         self.mode_msg = Mode()
+        self.start_init = time.time()
+        self.start = self.start_init
 
         #rospy.init_node('xai', anonymous=True)
         rospy.Subscriber('drl/observation_actuator_ref_pair', ObservationActuatorRefPair, self._callback)
@@ -67,6 +69,12 @@ class Agent():
 
         self.target_pose = (data.target_x, data.target_y, data.target_heading)
 
+        self.time_step = data.time_step
+        if data.time_step == 1:
+            self.start = time.time()
+        elif self.start == self.start_init:
+            self.start = self.start - data.time_step*0.25
+
 
     def get_observations(self):
         return self.obs
@@ -76,6 +84,10 @@ class Agent():
     
     def get_target_pose(self):
         return self.target_pose
+    
+    def get_time(self):
+        self.end = time.time()
+        return int(self.end-self.start)
     
 class Obs2ActionWrapper(torch.nn.Module):
     def __init__(self, model):
@@ -355,7 +367,9 @@ def main():
                     base_vectors,
                     action_low,
                     action_high,
-                    target_pose
+                    target_pose,
+                    agent.time_step,
+                    agent.get_time()
                 )
             except pygame.error as e:
                 print("Pygame error during rendering:", e)
