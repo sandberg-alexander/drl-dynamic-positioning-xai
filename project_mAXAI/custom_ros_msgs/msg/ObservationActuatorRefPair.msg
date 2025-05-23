@@ -20,6 +20,8 @@ float32 n_d3
 float32 alpha_d3
 float32 n_d4
 float32 alpha_d4
+float32 target_x
+float32 target_y
 float32 target_heading
 
 

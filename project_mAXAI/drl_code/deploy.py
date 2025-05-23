@@ -106,7 +106,7 @@ class DRLDeployer:
         self.test_length_spline = 200
         self.spline_x, self.spline_y = build_spline()
         self.s = 0.0
-        self.ds_spline = 0.0025
+        self.ds_spline = 0.005
 
         self.sample_nr = 0
         self.vep_length_action = 200
@@ -126,6 +126,7 @@ class DRLDeployer:
             # Trigger corresponding start
             if new_mode == 0:
                 self._set_mode(0)
+                rospy.loginfo(f"----- '0' - DP mode")
             elif new_mode == 1:
                 self._start_dp_test()
             elif new_mode == 2:
@@ -152,6 +153,7 @@ class DRLDeployer:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_0:
                         self._set_mode(0)
+                        rospy.loginfo(f"----- '0' - DP mode")
                     elif event.key == pygame.K_1:
                         self._start_dp_test()
                     elif event.key == pygame.K_2:
@@ -181,7 +183,6 @@ class DRLDeployer:
             
             elif self.mode_flag == 5:
                 self._run_vf_sample()
-            # Sampling modes 4 and 5 can be added similarly
 
             # Step the agent
             action, _ = self.model.predict(self.obs, deterministic=True)
@@ -201,10 +202,11 @@ class DRLDeployer:
         self.mode_msg.mode = mode
         self.pub_mode.publish(self.mode_msg)
         self.time_step = 1
-        rospy.loginfo(f"----- Mode set to {mode} -----")
+        #rospy.loginfo(f"----- Mode set to {mode}")
 
     def _start_dp_test(self):
         self._set_mode(1)
+        rospy.loginfo(f"----- '1' - Testing mode: DP")
         self.pose_nr = 0
         self.init_pose = self.env.unwrapped.target_pose
         self.data = np.zeros((self.vep_length_dp * self.test_length_dp, self.data_points))
@@ -215,6 +217,7 @@ class DRLDeployer:
             filename = f"{self.data_path}data_test_dp_{ts}.csv"
             np.savetxt(filename, self.data, delimiter=",", fmt="%f", header=self.header, comments="")
             self._set_mode(0)
+            rospy.loginfo(f"----- '0' - DP mode")
         elif self.time_step % self.vep_length_dp == 0:
             if self.pose_nr < 4:
                 dx, dy, heading = self.test_pose[self.pose_nr]
@@ -226,6 +229,7 @@ class DRLDeployer:
 
     def _start_north_test(self):
         self._set_mode(2)
+        rospy.loginfo(f"----- '2' - Testing mode: path-following-north")
         self.target_msg.heading = 0
         self.data = np.zeros((self.test_length_north, self.data_points))
 
@@ -235,12 +239,14 @@ class DRLDeployer:
             filename = f"{self.data_path}data_test_north_{ts}.csv"
             np.savetxt(filename, self.data, delimiter=",", fmt="%f", header=self.header, comments="")
             self._set_mode(0)
+            rospy.loginfo(f"----- '0' - DP mode")
         else:
             self.target_msg.north = self.env.unwrapped.target_pose[0] + self.ds_north
             self.pub_target.publish(self.target_msg)
 
     def _start_spline_test(self):
         self._set_mode(3)
+        rospy.loginfo(f"----- '3' - Testing mode: path-following-spline")
         self.init_pose = self.env.unwrapped.target_pose
         self.data = np.zeros((self.test_length_spline, self.data_points))
         self.s = 0.0
@@ -251,6 +257,7 @@ class DRLDeployer:
             filename = f"{self.data_path}data_test_spline_{ts}.csv"
             np.savetxt(filename, self.data, delimiter=",", fmt="%f", header=self.header, comments="")
             self._set_mode(0)
+            rospy.loginfo(f"----- '0' - DP mode")
         else:
             self.s += self.ds_spline
             x_t = float(self.spline_x(self.s))
@@ -265,6 +272,7 @@ class DRLDeployer:
 
     def _start_action_sample(self):
         self._set_mode(4)
+        rospy.loginfo(f"----- '4' - Sampling mode: action")
         self.pose_nr = 0
         self.init_pose = self.env.unwrapped.target_pose
         self.data = np.zeros((self.sample_length_action * self.vep_length_action // 2, len(self.obs)))
@@ -275,6 +283,7 @@ class DRLDeployer:
             filename = f"/app/xai_samples/action/sample_{ts}.csv"
             np.savetxt(filename, self.data, delimiter=",", fmt="%f", header=self.header2, comments="")
             self._set_mode(0)
+            rospy.loginfo(f"----- '0' - DP mode")
         elif self.time_step % self.vep_length_action == 0:
             if self.pose_nr < 4:
                 dx, dy, heading = self.sample_pose[self.pose_nr]
@@ -286,6 +295,7 @@ class DRLDeployer:
 
     def _start_vf_sample(self):
         self._set_mode(5)
+        rospy.loginfo(f"----- '5' - Sampling mode: value-function")
         self.data = np.zeros((self.sample_length_vf, len(self.obs)))
 
     def _run_vf_sample(self):
@@ -293,7 +303,9 @@ class DRLDeployer:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"/app/xai_samples/value_function/sample_{ts}.csv"
             np.savetxt(filename, self.data, delimiter=",", fmt="%f", header=self.header2, comments="")
+            rospy.loginfo(f"Updated acceptable behavior")
             self._set_mode(0)
+            rospy.loginfo(f"----- '0' - DP mode")
 
     def _publish_obs_act(self, obs):
         self.obs_act_msg.x_tilde, self.obs_act_msg.y_tilde, self.obs_act_msg.psi_tilde = obs[0], obs[1], obs[2]
@@ -308,6 +320,8 @@ class DRLDeployer:
         self.obs_act_msg.n_d2, self.obs_act_msg.alpha_d2 = thrusters[1], angles[1]
         self.obs_act_msg.n_d3, self.obs_act_msg.alpha_d3 = thrusters[2], angles[2]
         self.obs_act_msg.n_d4, self.obs_act_msg.alpha_d4 = thrusters[3], angles[3]
+        self.obs_act_msg.target_x = self.env.unwrapped.target_pose[0]
+        self.obs_act_msg.target_y = self.env.unwrapped.target_pose[1]
         self.obs_act_msg.target_heading = self.env.unwrapped.target_pose[2]
         self.pub_obs_act.publish(self.obs_act_msg)
 

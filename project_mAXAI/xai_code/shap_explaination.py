@@ -10,6 +10,7 @@ import sys
 import numpy as np
 import math
 import glob
+import cv2
 import gymnasium as gym
 from stable_baselines3 import PPO
 from render_explaination import RenderExplaination
@@ -20,7 +21,7 @@ class Agent():
     def __init__(self):
         self.obs = None
         self.action = None
-        self.target_heading = None
+        self.target_pose = None
         self.mode_flag = 0
 
         self.pub_mode = rospy.Publisher(
@@ -63,8 +64,8 @@ class Agent():
             (data.n_d3/900, data.alpha_d3),
             (data.n_d4/900, data.alpha_d4),
         ]
-    
-        self.target_heading = data.target_heading
+
+        self.target_pose = (data.target_x, data.target_y, data.target_heading)
 
 
     def get_observations(self):
@@ -73,8 +74,8 @@ class Agent():
     def get_actuator_ref(self):
         return self.actuator_ref
     
-    def get_target_heading(self):
-        return self.target_heading
+    def get_target_pose(self):
+        return self.target_pose
     
 class Obs2ActionWrapper(torch.nn.Module):
     def __init__(self, model):
@@ -185,25 +186,21 @@ def main():
     num_random = 500
     random_obs = np.array([env.observation_space.sample() for _ in range(num_random)])
     random_obs = np.concatenate([random_obs, -random_obs])
-    print(random_obs)
     bakground_obs = random_obs
 
     #df = pd.read_csv("/app/samples/training_20250328_131443/samples.csv")
     #samples_obs = df.iloc[:,:].values
     samples_obs = np.array([[0,0,0,0,0,0,0,0,0,0,0,0,0,0]])
-    print(samples_obs)
 
     bakground_torch = torch.tensor(bakground_obs, dtype=torch.float32)
     samples_torch = torch.tensor(samples_obs, dtype=torch.float32)
 
     # SHAP explainers
     explainer_action = shap.DeepExplainer(obs2action_model, bakground_torch)
-    print(1)
     explainer_value = shap.DeepExplainer(obs2value_model, samples_torch)
     #explainer_value = shap.DeepExplainer(obs2value_model, samples_torch)
     base_vectors = explainer_action.expected_value
     print("Base vectors:", base_vectors)
-
     # constraints
     max_distance = 10
     max_heading_angle = 180
@@ -221,11 +218,20 @@ def main():
 
     # init
     render = RenderExplaination()
-    fps = 30
+    fps = 5
     clock = pygame.time.Clock()
     sleep_time = 0.1
     agent = Agent()
-    
+
+    ros_master_uri = os.environ.get('ROS_MASTER_URI')
+    if ros_master_uri == 'http://simulator_local:11311':
+        data_path = '/app/runs/sim/'
+    else:
+        data_path = '/app/runs/real/'
+    screen = pygame.display.get_surface()  # or whatever size you use
+    width, height = screen.get_size()
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')       # H.264 in an .mp4 file
+        
     rospy.sleep(sleep_time*3)
 
     # MAIN LOOP
@@ -250,35 +256,32 @@ def main():
                         agent.mode_msg.mode = 3
                         agent.mode_flag = 3
                         agent.pub_mode.publish(agent.mode_msg)
+                        out_fname = f"{data_path}video/{time.strftime('%Y%m%d_%H%M%S')}.mp4"
+                        video_writer = cv2.VideoWriter(out_fname, fourcc, fps, (width, height))
                     elif event.key == pygame.K_2:
                         agent.mode_msg.mode = 2
                         agent.mode_flag = 2
                         agent.pub_mode.publish(agent.mode_msg)
+                        out_fname = f"{data_path}video/{time.strftime('%Y%m%d_%H%M%S')}.mp4"
+                        video_writer = cv2.VideoWriter(out_fname, fourcc, fps, (width, height))
                     elif event.key == pygame.K_1:
                         agent.mode_msg.mode = 1
                         agent.mode_flag = 1
                         agent.pub_mode.publish(agent.mode_msg)
+                        out_fname = f"{data_path}video/{time.strftime('%Y%m%d_%H%M%S')}.mp4"
+                        video_writer = cv2.VideoWriter(out_fname, fourcc, fps, (width, height))
                     elif event.key == pygame.K_0:
                         agent.mode_msg.mode = 0
                         agent.mode_flag = 0
                         agent.pub_mode.publish(agent.mode_msg)
             
             if agent.mode_msg.mode == 5 and agent.mode_flag == 0:
-                print(1)
                 latest = max(glob.glob("/app/xai_samples/value_function/sample_*.csv"), key=os.path.getmtime)
-                print(2)
                 df = pd.read_csv(latest)
-                print(3)
                 samples_obs = df.iloc[:,:].values
-                print(4)
                 samples_torch = torch.tensor(samples_obs, dtype=torch.float32)
-                print(5)
-                print(samples_torch.shape)
-                print(samples_torch)
                 explainer_value = shap.DeepExplainer(obs2value_model, samples_torch)
-                print(6)
                 agent.mode_msg.mode = 0
-                print(7)
             
             # # get actions
             # actions = agent.get_actions()
@@ -295,7 +298,7 @@ def main():
             # ]
 
             # get target heading
-            target_heading = agent.get_target_heading()
+            target_pose = agent.get_target_pose()
 
             # get actuator ref
             actuator_ref = agent.get_actuator_ref()
@@ -352,11 +355,23 @@ def main():
                     base_vectors,
                     action_low,
                     action_high,
-                    target_heading
+                    target_pose
                 )
             except pygame.error as e:
                 print("Pygame error during rendering:", e)
                 break
+            
+            if agent.mode_msg.mode in [1,2,3]:
+                surface = pygame.display.get_surface()
+                frame = pygame.surfarray.array3d(surface)          # (W, H, 3) in RGB
+                frame = np.transpose(frame, (1, 0, 2))             # -> (H, W, 3)
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)      # OpenCV wants BGR
+
+                video_writer.write(frame)                          # add frame to the file
+                
+                if agent.mode_flag == 0:
+                    video_writer.release()        # very important – flushes and closes the file
+                    agent.mode_msg.mode = 0
 
             try:
                 rospy.sleep(sleep_time)
@@ -370,6 +385,7 @@ def main():
     finally:
         print("Quitting pygame...")
         pygame.quit
+        video_writer.release()        # very important – flushes and closes the file
 
 
 if __name__ == '__main__':

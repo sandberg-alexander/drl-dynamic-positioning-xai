@@ -29,6 +29,7 @@ class Color(Enum):
     DESIRED_YELLOW = (255,102,0)
     DESIRED_LIGHT_YELLOW = (255,205,128)
     OCEAN_BLUE = (209,237,255)
+    OCEAN_GRID = (182, 206, 222)
     VELOCITY_GREEN = (0,255,123)
 
     LIGHT_RED = (255, 171, 171)
@@ -444,6 +445,94 @@ class VesselRender(Window):
                                         [self.VESSEL_LENGTH/2-self.VESSEL_TRIANGLE, self.VESSEL_TRIANGLE/2],
                                         [self.VESSEL_LENGTH/2-self.VESSEL_TRIANGLE, -self.VESSEL_TRIANGLE/2]])
         self.moment_marker_line = np.array([[0, 0], [self.VESSEL_MOMENT_MARKER, 0]])
+    
+    def _draw_body_grid(self,
+                    x_err,
+                    y_err,
+                    psi_err,
+                    target_pose,
+                    spacing: float = 1.0,
+                    color = Color.GRAY.value,
+                    width: int = 1):
+        """
+        Same pinning logic as before, but with the grid rotated by `psi_err`
+        degrees (positive CCW).  Everything else is unchanged.
+        """
+        # ------------------------------------------------------------------
+        # 0.  Pre-compute a few things we need again and again
+        # ------------------------------------------------------------------
+        circle = self._transform_vessel(x_err, y_err, psi_err, self.circle_point)
+        W, H   = self.window_width, self.window_height
+        cx, cy = self._world_2_pixels(circle).ravel()          # vessel-pixel centre
+
+        s      = self.scale                                    # px / metre
+        px     = spacing * s                                   # px per grid cell
+
+        # where (x_n, y_n) is the pixel that represents target_pose[:2]
+        x_n, y_n = self._world_2_pixels(np.array([list(target_pose[:2])])).ravel()
+
+        x_p = x_n - 25 - int(x_n / px) * px
+        y_p = y_n - 25 - int(y_n / px) * px
+
+        # ------------------------------------------------------------------
+        # 1.  Build the list of UNROTATED line offsets  (exactly what you had)
+        # ------------------------------------------------------------------
+        horiz = []
+        vert  = []
+
+        # horizontal lines --------------------------------------------------
+        y0 = cy - y_p
+        horiz.append(y0)
+        dy = px
+        while y0 + dy <= H:
+            horiz.append(y0 + dy)
+            dy += px
+        dy = px
+        while y0 - dy >= 0:
+            horiz.append(y0 - dy)
+            dy += px
+
+        # vertical lines ----------------------------------------------------
+        x0 = cx - x_p
+        vert.append(x0)
+        dx = px
+        while x0 + dx <= W:
+            vert.append(x0 + dx)
+            dx += px
+        dx = px
+        while x0 - dx >= 0:
+            vert.append(x0 - dx)
+            dx += px
+
+        # ------------------------------------------------------------------
+        # 2.  Rotate every line about (cx, cy) by  ψ = psi_err  degrees
+        # ------------------------------------------------------------------
+        ang  = math.radians(psi_err-target_pose[2])          # positive = CCW
+        cosA = math.cos(ang)
+        sinA = math.sin(ang)
+
+        # screen diagonal – long enough so that rotated lines cover the view
+        diag = math.hypot(W, H)
+
+        # helper: rotate a point round the centre
+        def _rot(pt):
+            x, y = pt
+            dx, dy = x - cx, y - cy           # translate to origin
+            xr  = dx * cosA - dy * sinA
+            yr  = dx * sinA + dy * cosA
+            return (cx + xr, cy + yr)
+
+        # draw horizontal (world-Y) lines  ----------------------------------
+        for y in horiz:
+            p1 = _rot((-diag, y))             # far left
+            p2 = _rot(( diag, y))             # far right
+            pygame.draw.line(self.surface, color, p1, p2, width)
+
+        # draw vertical (world-X) lines  ------------------------------------
+        for x in vert:
+            p1 = _rot((x, -diag))             # far up
+            p2 = _rot((x,  diag))             # far down
+            pygame.draw.line(self.surface, color, p1, p2, width)
 
     def draw_vessel(self, x_err=None, y_err=None, psi_err=None, ned=False):
         if ned:
@@ -539,7 +628,7 @@ class BodyRender(VesselRender):
     ACTUATOR_X = 1.8
     ACTUATOR_Y = 0.8
 
-    def __init__(self, screen, window_pos, title="BODY-frame", window_width=450, window_height=450):
+    def __init__(self, screen, window_pos, title="State and desired actuator view in BODY-frame", window_width=450, window_height=450):
         super().__init__(screen, window_pos, self.SCALE, title, window_width, window_height)
         
         self.label_font =  pygame.font.SysFont('DejaVu Sans', 12)
@@ -549,12 +638,16 @@ class BodyRender(VesselRender):
             (Color.VELOCITY_GREEN.value, "{'surge', 'sway', 'angular'} velocity")
         )
 
-        self.legend_surface, self.box_pos = self.create_legend(self.body_legend_items, self.label_font, padding_bottom=0)
+        self.legend_surface, self.box_pos = self.create_legend(self.body_legend_items, self.label_font, spacing=5, padding=5, margin=5, padding_bottom=0)
 
         self.actuator_pos = np.array([[self.ACTUATOR_X, -self.ACTUATOR_Y],
                                       [self.ACTUATOR_X, self.ACTUATOR_Y],
                                       [-self.ACTUATOR_X, self.ACTUATOR_Y],
                                       [-self.ACTUATOR_X, -self.ACTUATOR_Y]])
+        
+        self._make_compass_base(radius=30)
+        cx = cy = self._compass_base.get_width() // 2
+        self._compass_screen_center = (10 + cx, 10 + cy)
     
     def _draw_actuator_ref(self, actuator_ref):
         for i, (x,y) in enumerate(self.actuator_pos):
@@ -639,17 +732,92 @@ class BodyRender(VesselRender):
             total_moment_prime += M_prime
         return total_moment_prime
 
-    def render(self, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat):
+
+    def _make_compass_base(self, radius=50):
+        """
+        Build a Surface that contains:
+          • circle + four triangular points
+          • N/E/S/W letters, positioned *beyond* the circle
+        This surface is padded so that rotating it never clips the letters.
+        """
+        # how far beyond the circle to put each letter:
+        letter_offset = 15  
+        # total half-size of the surf:
+        half = radius + letter_offset + 10  
+        size = half * 2
+        surf = pygame.Surface((size, size), pygame.SRCALPHA)
+        cx = cy = size / 2
+        col = Color.OCEAN_GRID.value
+
+        # draw circle
+        pygame.draw.circle(surf, col, (cx, cy), radius, width=2)
+
+        # draw the four little triangles (same as before)
+        tri_h, tri_w = 30, 8
+        # N
+        pygame.draw.polygon(surf, col, [
+            (cx, cy-radius),
+            (cx+tri_w, cy-radius+tri_h),
+            (cx-tri_w, cy-radius+tri_h),
+        ])
+        # E
+        pygame.draw.polygon(surf, col, [
+            (cx+radius, cy),
+            (cx+radius-tri_h, cy+tri_w),
+            (cx+radius-tri_h, cy-tri_w),
+        ])
+        # S
+        pygame.draw.polygon(surf, col, [
+            (cx, cy+radius),
+            (cx+tri_w, cy+radius-tri_h),
+            (cx-tri_w, cy+radius-tri_h),
+        ])
+        # W
+        pygame.draw.polygon(surf, col, [
+            (cx-radius, cy),
+            (cx-radius+tri_h, cy+tri_w),
+            (cx-radius+tri_h, cy-tri_w),
+        ])
+
+        # now *also* draw N/E/S/W letters *on this same surf*
+        font = pygame.font.SysFont('DejaVu Sans', 16, bold=True)
+        for letter, deg in [('N', 0), ('E', 90), ('S', 180), ('W', 270)]:
+            txt = font.render(letter, True, col)
+            w, h = txt.get_size()
+            # angle for placement: rotate so that 0° is upward
+            a = math.radians(deg - 90)
+            x = cx + math.cos(a) * (radius + letter_offset) - w/2
+            y = cy + math.sin(a) * (radius + letter_offset) - h/2
+            surf.blit(txt, (x, y))
+
+        self._compass_base = surf
+        self._compass_radius = radius
+
+    def draw_compass(self, heading_deg):
+        """
+        Rotate the *entire* pre-made compass (circle+triangles+letters)
+        and blit it so its CENTER stays at _compass_screen_center.
+        """
+        rose = pygame.transform.rotate(self._compass_base, -heading_deg)
+        rect = rose.get_rect(center=self._compass_screen_center)
+        self.surface.blit(rose, rect)
+
+
+
+    def render(self, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, target_pose):
         # init
         self.render_surface()
         
         # BODY render
         self.surface.fill(Color.OCEAN_BLUE.value)
+
+        self._draw_body_grid(x_tilde, y_tilde, psi_tilde, target_pose, spacing = 1.0, color = Color.OCEAN_GRID.value, width = 1)
         self.draw_target(x_tilde, y_tilde, psi_tilde)
         self.draw_vessel(x_tilde, y_tilde, psi_tilde)
         self._draw_actuator_ref(actuator_ref)
         self._draw_force_and_moment(tot_thrust, tot_angle, tot_angular_thrust)
         self._draw_velocities(u_hat, v_hat, r_hat)
+        self.draw_compass(heading_deg=psi_tilde-target_pose[2])
         self.draw_legend(self.legend_surface, self.box_pos)
         
         # final render
@@ -663,17 +831,61 @@ class BodyRender(VesselRender):
 class NedRender(VesselRender):
     SCALE = 25
     
-    def __init__(self, screen, window_pos, title="NED-frame", window_width=450, window_height=450):
+    def __init__(self, screen, window_pos, title="Global map in NED-frame", window_width=450, window_height=450):
         super().__init__(screen, window_pos, self.SCALE, title, window_width, window_height)
     
-    def render(self, x_err, y_err, psi_err, target_heading):
+    
+    def _draw_grid(self,
+                target_pose,
+                spacing: float = 1.0,
+                color = Color.GRAY.value,
+                width: int = 1):
+        """
+        Draw a world‐aligned grid in NED whose lines fall on integer multiples
+        of `spacing` (in meters).  The pixel‐center of the surface is always
+        the world‐coordinate (target_pose.x, target_pose.y).
+        """
+        W, H = self.window_width, self.window_height
+        cx, cy = self.center               # pixel where world (tx,ty) sits
+        s = self.scale                     # pixels per meter
+        px = spacing * s                   # pixels per grid cell
+
+        # find fractional pixel‐offset inside the grid cell
+        # i.e. how far (in pixels) our center is into its current meter‐grid
+        off_x = (target_pose[0] * s) % px  
+        off_y = (target_pose[1] * s) % px  
+
+        # the first vertical line at or to the left of x=0:
+        start_x = cx + off_x
+        # march left until off‐screen, then march right
+        x = start_x - ((start_x // px) * px)
+        if x > px:
+            x -= px
+
+        # similarly for horizontals, but NED wants +Y up → pixel Y goes down
+        start_y = cy - off_y
+        y = start_y - ((start_y // px) * px)
+        if y > px:
+            y -= px
+        
+        # draw verticals
+        while y < W:
+            pygame.draw.line(self.surface, color, (y, 0), (y, H), width)
+            y += px
+
+        while x < H:
+            pygame.draw.line(self.surface, color, (0, x), (W, x), width)
+            x += px
+
+    def render(self, x_err, y_err, psi_err, target_pose):
         # init
         self.render_surface()
         
         # NED render
         self.surface.fill(Color.OCEAN_BLUE.value)
-        self.draw_target(x_err, y_err, target_heading, ned=True)
-        self.draw_vessel(x_err, y_err, psi_err-target_heading, ned=True)
+        self._draw_grid(target_pose, spacing=1.0, color=Color.OCEAN_GRID.value, width=1)
+        self.draw_target(x_err, y_err, target_pose[2], ned=True)
+        self.draw_vessel(x_err, y_err, psi_err-target_pose[2], ned=True)
 
         # final render
         self.render_surface_title()
@@ -685,12 +897,12 @@ class NedRender(VesselRender):
 
 class ShapExplainRender(VesselRender, Utilities):
     
-    SCALE = 25
+    SCALE = 50
     ACTUATOR_X = 1.8
     ACTUATOR_Y = 0.8
     VESSEL_MOMENT_MARKER = 50/SCALE
 
-    def __init__(self, screen, window_pos, title="Action explained BODY-frame", window_width=450, window_height=450):
+    def __init__(self, screen, window_pos, title="Desired total trust force/moment explained BODY-frame", window_width=450, window_height=450):
         VesselRender.__init__(self, screen, window_pos, self.SCALE, title, window_width, window_height)
         Utilities.__init__(self)
 
@@ -704,11 +916,11 @@ class ShapExplainRender(VesselRender, Utilities):
         # )
 
         self.body_legend_items = (
-            (Color.RED.value, "Main feature causing the action"),
-            (Color.DESIRED_LIGHT_YELLOW.value, "Estimated action output based on main feature")
+            (Color.RED.value, "Main feature causing the desired total trust force/moment"),
+            (Color.DESIRED_LIGHT_YELLOW.value, "Estimated desired total trust force/moment based on main feature")
         )
 
-        self.legend_surface, self.box_pos = self.create_legend(self.body_legend_items, self.label_font, padding_bottom=0)
+        self.legend_surface, self.box_pos = self.create_legend(self.body_legend_items, self.label_font, marker_size=12, spacing=5, padding=5, margin=5, padding_bottom=0)
 
         self.idx = 0
         self.prev_idx = -1
@@ -723,7 +935,63 @@ class ShapExplainRender(VesselRender, Utilities):
                                             [self.ACTUATOR_X, self.ACTUATOR_Y],
                                             [-self.ACTUATOR_X, self.ACTUATOR_Y],
                                             [-self.ACTUATOR_X, -self.ACTUATOR_Y]])
+
+
+    def _find_explaination2(self, shap_values_action, base_value, action_low, action_high):
+        sv_action = np.array(shap_values_action)
+        sv_base = np.array(base_value)
+        act_low = np.array(action_low)
+        act_high = np.array(action_high)
+
+        sv_all_actions = np.clip(sv_action.sum(axis=1)+sv_base,act_low,act_high)
         
+        pos_totalt = np.where(sv_action>0, sv_action, 0).sum(axis=1) + np.where(sv_base>0,sv_base,0)
+        neg_totalt = np.where(sv_action<0, sv_action, 0).sum(axis=1) + np.where(sv_base<0,sv_base,0)
+
+        denominators = np.where(act_high == 1, pos_totalt, neg_totalt)
+
+        c = sv_all_actions / denominators
+        
+        # sv_action: shape (8, 14)
+        # c:          shape (8,)
+        # We’ll treat (0,1), (2,3), (4,5), (6,7) as your (x,y) pairs.
+
+        # 1) First, reshape into “pairs”:
+        num_actions, num_feats = sv_action.shape
+        assert num_actions % 2 == 0, "Need an even number of action‐rows"
+        sv_pairs = sv_action.reshape(-1, 2, num_feats)   # shape (4, 2, 14)
+        c_pairs  = c.reshape(-1, 2)                      # shape (4, 2)
+        #print("Pairs-------")
+        #print(sv_pairs, c_pairs)
+
+        # 2) Scale each x‐row by its c and each y‐row by its c:
+        #    we broadcast c_pairs (4,2) over the features‐axis
+        scaled = sv_pairs * c_pairs[:, :, None]          # shape (4, 2, 14)
+        self.scaled = scaled
+
+        base_scaled = (sv_base[None, None, :] * c_pairs[:, :, None]).sum(axis=2, keepdims=True)
+        # now base_scaled.shape == (4,2,1)
+        # 2) Concatenate onto the end of your existing scaled array
+        self.scaled_with_base = np.concatenate([scaled, base_scaled], axis=2)
+        # scaled_with_base.shape == (4,2,15)
+
+        # 3) Square + sum over the x/y axis, then sqrt → Euclidean distance per feature
+        #sq       = scaled ** 2                           # shape (4, 2, 14)
+        #sum_sq   = sq.sum(axis=1)                        # shape (4, 14)
+        #dists    = np.sqrt(sum_sq)                       # shape (4, 14)
+        dists_tot = np.hypot(base_scaled[:,0,:], base_scaled[:,1,:])
+        dists = np.hypot(scaled[:,0,:], scaled[:,1,:])
+
+        # 4) Clip each distance between 0 and 1
+        dists_clipped = np.clip(dists, 0, 1)             # shape (4, 14)
+        dists_tot_clipped = np.clip(dists, 0, 1)
+        sumed_features = dists_clipped.sum(axis=0)
+        max_idx = np.argmax(sumed_features)
+        self.idx = max_idx
+        self.dists_clipped = dists_clipped
+        self.dists_tot_clipped = dists_tot_clipped
+
+
     def _find_explaination(self, lists, n=3, list_in_list=True):
         combined_values = []
         if list_in_list:
@@ -1304,9 +1572,9 @@ class ShapExplainRender(VesselRender, Utilities):
         tot_angle = math.atan2(thrust_y, thrust_x) * 180/np.pi
 
         return tot_thrust, tot_angle, tot_angular_thrust
-
+    def _ssa(self, angle):
+        return (angle+180) % 360 - 180
     def _draw_explaination4(self, shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors, action_low, action_high):
-        
 
         arr_RPM = np.array(shap_values_action)
         #print(arr_RPM)
@@ -1315,13 +1583,39 @@ class ShapExplainRender(VesselRender, Utilities):
         summed_array = np.sum(arr_RPM, axis=1)
         # --- CLIP the reconstructed predictions ---
 
-        reconstructed_pred_main_feature = np.clip(shap_feature_RPM + base_vectors, action_low, action_high) # Clip here
+        #reconstructed_pred_main_feature = np.clip(shap_feature_RPM + base_vectors, action_low, action_high) # Clip here
         #reconstructed_pred_main_feature = shap_feature_RPM + base_vectors # Clip here
         reconstructed_pred_total = np.clip(summed_array + base_vectors, action_low, action_high)          # Clip here
+        #reconstructed_pred_total = self.dists_clipped.sum(axis=1)
 
+        thrusters_shap = self.dists_clipped[:,self.idx]
 
-        thrusters, angles, self.prev_angle_1, vec = self._calculate_actuator_inputs(reconstructed_pred_main_feature, self.prev_angle_1)
-        thrusters2, angles2, self.prev_angle_2, vec2 = self._calculate_actuator_inputs(reconstructed_pred_total, self.prev_angle_2)
+        angles_shap = np.where(
+            thrusters_shap == 0,
+            self.prev_angle_1,
+            np.rad2deg(np.arctan2(self.scaled[:,1,self.idx], self.scaled[:,0,self.idx])) # argument is (4x2x14)
+            )
+        if angles_shap[1] == 180:
+            angles_shap[1] = -180
+        
+        self.prev_angle_1 = angles_shap.copy()
+        vec = list(zip(thrusters_shap, angles_shap))
+        #print(vec)
+
+        thrusters_shap_tot = self.dists_tot_clipped.sum(axis=1)
+        angles_shap2 = np.where(
+            thrusters_shap_tot == 0,
+            self.prev_angle_2,
+            np.rad2deg(np.arctan2(self.scaled_with_base.sum(axis=2)[:,1], self.scaled_with_base.sum(axis=2)[:,0])) # argument is (4x2x14)
+            )
+        if angles_shap2[1] == 180:
+            angles_shap2[1] = -180
+        
+        self.prev_angle_2 = angles_shap2.copy()
+        vec2 = list(zip(thrusters_shap_tot, angles_shap2))
+
+        #thrusters, angles, self.prev_angle_1, vec = self._calculate_actuator_inputs(reconstructed_pred_main_feature, self.prev_angle_1)
+        #thrusters2, angles2, self.prev_angle_2, vec2 = self._calculate_actuator_inputs(reconstructed_pred_total, self.prev_angle_2)
 
         vector = self._combine_actuator_ref(vec, self.actuator_pos)
         vector2 = self._combine_actuator_ref(vec2, self.actuator_pos)
@@ -1387,8 +1681,17 @@ class ShapExplainRender(VesselRender, Utilities):
         #self._draw_curved_arrow(self._scalar2pygame(tot_angular_thrust)/radius, self.center, Color.VELOCITY_GREEN.value, radius=radius+10)
         #self._draw_curved_arrow(np.clip(self._scalar2pygame(ang_thrust)/(900*radius),-2*np.pi,2*np.pi), self.center, Color.DESIRED_LIGHT_YELLOW.value, radius=radius, arrowhead_length=5, arrowhead_widht=5)
         #self._draw_curved_arrow(self._scalar2pygame(vector2[2])/radius, self.center, Color.PURPLE.value, radius=radius+10)
-        self._draw_curved_arrow(self._scalar2pygame(vector[2])/radius, self.center, Color.DESIRED_LIGHT_YELLOW.value, radius=radius)
+        
+        
+        
+        raw_angle = vector[2] / radius
+        raw_angle = np.clip(raw_angle, -2*np.pi, 2*np.pi)
+        draw_angle = self._scalar2pygame(raw_angle)
+        self._draw_curved_arrow(draw_angle, self.center, Color.DESIRED_LIGHT_YELLOW.value, radius=radius)
 
+        
+        
+        
         #self._draw_curved_arrow(np.clip(self._scalar2pygame(vector2[2])/(900*radius),-2*np.pi,2*np.pi), self.center, Color.PURPLE.value, radius=radius+10)
         #self._draw_curved_arrow(np.clip(self._scalar2pygame(vector[2])/(900*radius),-2*np.pi,2*np.pi), self.center, Color.DESIRED_LIGHT_YELLOW.value, radius=radius, arrowhead_length=5, arrowhead_widht=5)
         #print(self._scalar2pygame(ang_thrust)/(900*radius))      
@@ -1440,11 +1743,11 @@ class ShapExplainRender(VesselRender, Utilities):
         elif self.idx == 5:
             self._draw_curved_arrow(np.deg2rad(r_hat), self.center, Color.RED.value, radius=self._scalar2pygame(self.VESSEL_LENGTH/2)+self.explain_offset, show_measurement=True, label=f"{r_hat*112.6/(360*2):.0f} °/s")
 
-        error = np.array([tot_thrust*900, tot_angle, tot_angular_thrust*900]) - np.array([vector[0]*900, vector[1], vector[2]*900])
+        error = np.array([tot_thrust, tot_angle, tot_angular_thrust]) - np.array([vector[0], vector[1], vector[2]])
 
-        acc_RPM = (900*2*2-abs(error[0]))/(900*2*2)
-        acc_angle = (360-abs(error[1]))/360
-        acc_moment = (900*2*2*(1.8+0.8) - abs(error[2]))/(900*2*2*(1.8+0.8))
+        acc_RPM = ((np.sqrt(2)+1)-abs(error[0]))/(np.sqrt(2)+1)
+        acc_angle = (180-abs(self._ssa(tot_angle-vector[1])))/180
+        acc_moment = (10.4 - abs(error[2]))/(10.4)
 
         acc_total = (acc_RPM+acc_angle+acc_moment)/3
 
@@ -1475,8 +1778,8 @@ class ShapExplainRender(VesselRender, Utilities):
             acc_total_color = Color.ORANGE.value
         else:
             acc_total_color = Color.RED.value
-     
-     
+    
+    
         text_surface1 = self.window_font.render(f"Explained RPM: {acc_RPM:.2f}", self.antialias, acc_RPM_color)
         text_rect1 = text_surface1.get_rect()
         text_rect1.topleft = (self._title_offset, self._title_offset*10)
@@ -1629,8 +1932,8 @@ class ShapExplainRender(VesselRender, Utilities):
 
         # if explain_vector != self.explain_vector:
         #     self.explain_vector = explain_vector
-
-        self._find_explaination(shap_values_action, n=1, list_in_list=self.RPM_true)
+        self._find_explaination2(shap_values_action, base_vectors, action_low, action_high)
+        #self._find_explaination(shap_values_action, n=1, list_in_list=self.RPM_true)
         #print(2)
         #self.idx=1
         # if self.idx != self.prev_idx:
@@ -1669,7 +1972,7 @@ class ShapRender(Window):
         self.label_font =  pygame.font.SysFont('DejaVu Sans', 12)
 
         self.window_padding = 40 # pixels
-        self.num_bars = 3 #14 # number of features
+        self.num_bars = 4 #14 # number of features
         self.num_bar_seg = 4 # number of outputs
         self.max_shap_value = 4
         self.increment = 1
@@ -1685,8 +1988,8 @@ class ShapRender(Window):
 
         self.feature_names = [
             'x̃ᵇₜ [m]',
-            'ỹᵇₜ [m]',
-            'ϕₜ [°]',
+            'ỹᵇₜ [m]',            
+            'ψ̃ₜ[°]',
             'ûₜ [m/s]',
             'v̂ₜ [m/s]',
             'r̂ₜ [°/s]',
@@ -1699,6 +2002,8 @@ class ShapRender(Window):
             'n_{x4d,ₜ₋₁} [RPM]',
             'n_{y4d,ₜ₋₁} [RPM]'
         ]
+        self.feature_names_full = self.feature_names[:]      # <- new
+
 
         # colors
         self.colors = [
@@ -1728,7 +2033,7 @@ class ShapRender(Window):
             self.label_rect[i] = self.label_surface[i].get_rect()
 
         # making bottom text
-        bottom_text = "Sum of |SHAP values|"
+        bottom_text = "Sum of SHAP based thrust components"
         self.bottom_text_surface = self.axis_font.render(bottom_text, self.antialias, Color.BLACK.value)
         self.bottom_text_rect = self.bottom_text_surface.get_rect()     
         self.bottom_text_rect.midbottom = ((self.window_width + self.axis_padding_width) / 2, self.window_height - self.window_padding / 2)
@@ -1777,7 +2082,8 @@ class ShapRender(Window):
         self.render_surface()
         
         # SHAP render
-        self._draw_bars(shap_values, shap_values3,base_value, action_low, action_high)
+        #self._draw_bars(shap_values, shap_values3,base_value, action_low, action_high)
+        self._draw_bars2(shap_values, shap_values3,base_value, action_low, action_high)
         self._draw_axis()
         self.draw_legend(self.legend_surface,self.box_pos)
         
@@ -1792,12 +2098,12 @@ class ShapRender(Window):
     def _shap_value_2_pixels(self, shap_value):
         return int(shap_value / self.max_shap_value * self.bar_allocation_width)
     
-    def _find_top_n_abs_combined_indices(self, lists, n=3, list_in_list=True):
+    def _find_top_n_abs_combined_indices(self, lists, base_value, action_low, action_high, n=3, list_in_list=True):
         combined_values = []
         if list_in_list:
             # Calculate the combined absolute values for each index
             for i in range(len(lists[0])):
-                total = sum(np.sqrt(lists[2*j][i]**2 + lists[2*j+1][i]**2) for j in range(len(lists)//2))
+                total = sum(np.sqrt((np.clip(lists[2*j][i]+base_value[2*j],action_low[2*j],action_high[2*j]))**2 + (np.clip(lists[2*j+1][i]+base_value[2*j+1],action_low[2*j+1],action_high[2*j+1]))**2) for j in range(len(lists)//2))
                 combined_values.append((i, total))  # Store (index, value) pairs
         else:
             for i in range(len(lists)):
@@ -1811,57 +2117,174 @@ class ShapRender(Window):
         
         return top_indices
 
-    def _draw_bars(self, shap_values,shap_value3,base_value, action_low, action_high):
-        # if explain_mode != self.explain_mode:
-        #     self.explain_mode = explain_mode
-        #     if self.RPM_true:
-        #         self.RPM_true = False
-        #         self._title = "Most influential features based on estimated values (SHAP)"
-        #     else:
-        #         self.RPM_true = True
-        #         self._title = "Most influential features based on actions (SHAP)"
-        #self.RPM_true=False
+    def _draw_bars2(self, shap_values_action, shap_values_vf, base_value,
+               action_low, action_high):
+        """
+        Draw four horizontal bars:
+        – the three most influential individual features
+        – one aggregated “Others” bar
+        """
 
 
-        if self.RPM_true:
-            shap_val = shap_values
-        else:
-            shap_val = shap_value3
+        # shap_values_action (8x14)
+        # shap_values_vf (14)
 
-        indices = self._find_top_n_abs_combined_indices(shap_val, list_in_list=self.RPM_true)
+        sv_action = np.array(shap_values_action)
+        sv_base = np.array(base_value)
+        act_low = np.array(action_low)
+        act_high = np.array(action_high)
 
-        for i,idx in enumerate(indices):
+        sv_all_actions = np.clip(sv_action.sum(axis=1)+sv_base,act_low,act_high)
+        
+        pos_totalt = np.where(sv_action>0, sv_action, 0).sum(axis=1) + np.where(sv_base>0,sv_base,0)
+        neg_totalt = np.where(sv_action<0, sv_action, 0).sum(axis=1) + np.where(sv_base<0,sv_base,0)
 
-            bar_seg_px = self.window_padding / 2 + self.axis_padding_width
+        denominators = np.where(act_high == 1, pos_totalt, neg_totalt)
 
-            shap = shap_value3[idx]      
- 
-            bar_seg_length = self._shap_value_2_pixels(shap)
-            # if shap > 0:
-            #     pygame.draw.rect(self.surface, Color.GREEN.value, (bar_seg_px, self.bars_py[i]+self.bar_gap, bar_seg_length, self.bar_height))
-            # else:
-            #     pygame.draw.rect(self.surface, Color.RED.value, (bar_seg_px, self.bars_py[i]+self.bar_gap, -bar_seg_length, self.bar_height))
+        c = sv_all_actions / denominators
+        
+        # sv_action: shape (8, 14)
+        # c:          shape (8,)
+        # We’ll treat (0,1), (2,3), (4,5), (6,7) as your (x,y) pairs.
 
-            for bar_seg in range(self.num_bar_seg):
-                #shap_value = abs(shap_values[bar_seg][idx])
-                #print(1)
-                arr_RPM = np.array(shap_values)
-                reconstructed = np.clip(arr_RPM[:,idx] + base_value, action_low, action_high)
-                #print(reconstructed)
-                shap_value = np.clip(np.sqrt(reconstructed[2*bar_seg]**2+reconstructed[2*bar_seg+1]**2),0,1)
-                #print(2.5)
-                bar_seg_length = self._shap_value_2_pixels(shap_value)
-                #print(3)
-                pygame.draw.rect(self.surface, self.colors[bar_seg],
-                                 (bar_seg_px, self.bars_py[i], bar_seg_length, self.bar_height))
-                bar_seg_px += bar_seg_length
+        # 1) First, reshape into “pairs”:
+        num_actions, num_feats = sv_action.shape
+        assert num_actions % 2 == 0, "Need an even number of action‐rows"
+        sv_pairs = sv_action.reshape(-1, 2, num_feats)   # shape (4, 2, 14)
+        c_pairs  = c.reshape(-1, 2)                      # shape (4, 2)
+
+        # 2) Scale each x‐row by its c and each y‐row by its c:
+        #    we broadcast c_pairs (4,2) over the features‐axis
+        scaled = sv_pairs * c_pairs[:, :, None]          # shape (4, 2, 14)
+
+        # 3) Square + sum over the x/y axis, then sqrt → Euclidean distance per feature
+        #sq       = scaled ** 2                           # shape (4, 2, 14)
+        #sum_sq   = sq.sum(axis=1)                        # shape (4, 14)
+        #dists    = np.sqrt(sum_sq)                       # shape (4, 14)
+        dists = np.hypot(scaled[:,0,:], scaled[:,1,:])
+
+        # 4) Clip each distance between 0 and 1
+        dists_clipped = np.clip(dists, 0, 1)             # shape (4, 14)
+        sumed_features = dists_clipped.sum(axis=0)
+        
+        top3_idx = np.argpartition(sumed_features, -3)[-3:]             # get any order of top3
+        top3_idx = top3_idx[np.argsort(-sumed_features[top3_idx])]      # then sort those three
+        top3_idx = list(top3_idx)
+        #print(f"top3_idx:{top3_idx}")
+
+        others_idx = [i for i in range(len(self.feature_names_full))
+                    if i not in top3_idx]
+
+        draw_order = top3_idx + [-1]          # –1 will mean “OTHERS”
+
+        # --------------------------------------------------
+        # 3. loop over the four bars to draw
+        # --------------------------------------------------
+        for bar_no, feat_idx in enumerate(draw_order):
+
+            # ---------- build the 4 coloured segments ----------
+            seg_width_px = []   # length-4 list of pixel widths
+            for seg in range(self.num_bar_seg):
+                if feat_idx == -1:  # -------- OTHERS ------------
+                    # sum this segment’s contribution over *all* residual features
+                    seg_val = 0.0
+                    for jj in others_idx:
+                        seg_val += dists_clipped[seg,jj]
+                else:               # -------- single feature ----
+                    seg_val = dists_clipped[seg,feat_idx]
+                seg_width_px.append(self._shap_value_2_pixels(seg_val))
+
+            # ---------- actually draw the bar ----------
+            x0 = self.window_padding/2 + self.axis_padding_width
+            y0 = self.bars_py[bar_no]
+            for seg, w in enumerate(seg_width_px):
+                pygame.draw.rect(self.surface, self.colors[seg],
+                                (x0, y0, w, self.bar_height))
+                x0 += w   # next segment starts where the last finished
+
+            # ---------- draw the label ----------
+            label = ("Others" if feat_idx == -1
+                    else self.feature_names_full[feat_idx])
+            self.label_surface[bar_no] = self.label_font.render(
+                label, self.antialias, Color.BLACK.value)
+            self.label_rect[bar_no] = self.label_surface[bar_no].get_rect()
+            self.label_rect[bar_no].topright = (
+                self.window_padding/2 + self.axis_padding_width - self.label_offset,
+                y0 + (self.bar_height - self.label_rect[bar_no].height)/2)
+            self.surface.blit(self.label_surface[bar_no],
+                            self.label_rect[bar_no])
             
-            self.label_surface[i] = self.label_font.render(self.feature_names[idx], self.antialias, Color.BLACK.value)
-            self.label_rect[i] = self.label_surface[i].get_rect()
-            self.label_rect[i].topright = (self.window_padding / 2 + self.axis_padding_width - self.label_offset,
-                                           self.bars_py[i] + (self.bar_height - self.label_rect[i].height) / 2)
+    def _draw_bars(self, shap_values, shap_values3, base_value,
+               action_low, action_high):
+        """
+        Draw four horizontal bars:
+        – the three most influential individual features
+        – one aggregated “Others” bar
+        """
 
-            self.surface.blit(self.label_surface[i], self.label_rect[i])
+        # --------------------------------------------------
+        # 1. pick data source (actions or estimated values)
+        # --------------------------------------------------
+        data = shap_values if self.RPM_true else shap_values3     # (4×14 list)
+
+        # --------------------------------------------------
+        # 2. pick the indices of the top-3 contributors
+        # --------------------------------------------------
+        top_idx = self._find_top_n_abs_combined_indices(
+            data, base_value, action_low, action_high,
+            list_in_list=self.RPM_true, n=3)
+        #print(f"top_idx:{top_idx}")
+
+        others_idx = [i for i in range(len(self.feature_names_full))
+                    if i not in top_idx]
+
+        draw_order = top_idx + [-1]          # –1 will mean “OTHERS”
+
+        # --------------------------------------------------
+        # 3. loop over the four bars to draw
+        # --------------------------------------------------
+        for bar_no, feat_idx in enumerate(draw_order):
+
+            # ---------- build the 4 coloured segments ----------
+            seg_width_px = []   # length-4 list of pixel widths
+            for seg in range(self.num_bar_seg):
+                if feat_idx == -1:  # -------- OTHERS ------------
+                    # sum this segment’s contribution over *all* residual features
+                    seg_val = 0.0
+                    for jj in others_idx:
+                        reco = np.clip(np.array(data)[:, jj] + base_value,
+                                    action_low, action_high)
+                        seg_val += np.clip(
+                            np.hypot(reco[2*seg], reco[2*seg+1]), 0, 1)
+                else:               # -------- single feature ----
+                    
+                    reco = np.clip(np.array(data)[:, feat_idx] + base_value,
+                                action_low, action_high)
+                    seg_val = np.clip(
+                        np.hypot(reco[2*seg], reco[2*seg+1]), 0, 1)
+
+                seg_width_px.append(self._shap_value_2_pixels(seg_val))
+
+            # ---------- actually draw the bar ----------
+            x0 = self.window_padding/2 + self.axis_padding_width
+            y0 = self.bars_py[bar_no]
+            for seg, w in enumerate(seg_width_px):
+                pygame.draw.rect(self.surface, self.colors[seg],
+                                (x0, y0, w, self.bar_height))
+                x0 += w   # next segment starts where the last finished
+
+            # ---------- draw the label ----------
+            label = ("Others" if feat_idx == -1
+                    else self.feature_names_full[feat_idx])
+            self.label_surface[bar_no] = self.label_font.render(
+                label, self.antialias, Color.BLACK.value)
+            self.label_rect[bar_no] = self.label_surface[bar_no].get_rect()
+            self.label_rect[bar_no].topright = (
+                self.window_padding/2 + self.axis_padding_width - self.label_offset,
+                y0 + (self.bar_height - self.label_rect[bar_no].height)/2)
+            self.surface.blit(self.label_surface[bar_no],
+                            self.label_rect[bar_no])
+
 
     def _draw_axis(self):
         pygame.draw.line(self.surface, Color.BLACK.value, self.origo, self.x_axis_end, width=2) # x-axis
@@ -1906,11 +2329,11 @@ class RenderExplaination():
             "α_{d₄,ₜ} [°]"
         )
 
-        self._body_window = BodyRender(self._screen, window_pos=(25,25))
-        self._ned_window = NedRender(self._screen, window_pos=(25,500))
+        self._ned_window = NedRender(self._screen, window_pos=(25,25))
+        self._body_window = BodyRender(self._screen, window_pos=(25,500))
         self._shap_window_top = ShapRender(self._screen, window_pos=(500,25),
                                            legend_items=self.shap_legend_items1,
-                                           title="SHAP-values RPM")
+                                           title="SHAP-values thrust")
         self._shap_window_bottom = ShapRender(self._screen, window_pos=(500,500),
                                               legend_items=self.shap_legend_items2,
                                               title="SHAP-values azimuth angles", window_width=475)
@@ -1919,10 +2342,14 @@ class RenderExplaination():
 
 
 
-    def render_frame(self, shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors, action_low, action_high, target_heading):
-        self._screen.fill(Color.SCREEN_COLOR.value)
-        self._body_window.render(actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat)
-        self._ned_window.render(x_tilde, y_tilde, psi_tilde, target_heading)
+    def render_frame(self, shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors, action_low, action_high, target_pose):
+        #print(sum(shap_values_value))
+        if sum(shap_values_value) < -2:
+            self._screen.fill(Color.RED.value)
+        else:
+            self._screen.fill(Color.SCREEN_COLOR.value)
+        self._body_window.render(actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, target_pose)
+        self._ned_window.render(x_tilde, y_tilde, psi_tilde, target_pose)
         self._shap_explain_window.render(shap_values_action, shap_values_value, actuator_ref, tot_thrust, tot_angle, tot_angular_thrust, x_tilde, y_tilde, psi_tilde, u_hat, v_hat, r_hat, base_vectors, action_low, action_high)
 
         self._shap_window_top.render(shap_values_action, shap_values_value, base_vectors, action_low, action_high)
