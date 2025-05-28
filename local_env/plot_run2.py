@@ -8,12 +8,12 @@ from numpy import radians as rad
 from matplotlib.lines import Line2D
 import time
 
-df = pd.read_csv("../data/runs/sim/data_test_dp_20250523_152609.csv")
+df = pd.read_csv("../data/runs/real/data_test_dp_20250528_122826.csv")
 
 scale = 1 #10/6.4
-render_start = 0
-render_end = 200*5
-run_number = 7
+render_start = 0 
+render_end = 200 *5
+run_number = 11
 episode_interval = 200
 
 x = df['x']*10
