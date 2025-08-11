@@ -98,8 +98,8 @@ class DRLDeployer:
         
         self.vep_length_dp = 200
         self.test_length_dp = 5
-        #self.test_pose = [(4,0,0),(4,4,0),(0,0,0),(0,0,np.pi)]
-        self.test_pose = [(0,0,np.pi),(0,0,0),(4,4,0),(4,0,0)]
+        self.test_pose = [(4,0,0),(4,4,0),(0,0,0),(0,0,np.pi)]
+        #self.test_pose = [(0,0,np.pi),(0,0,0),(4,4,0),(4,0,0)]
 
         self.test_length_north = 200
         self.ds_north = 0.1

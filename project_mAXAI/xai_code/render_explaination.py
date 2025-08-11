@@ -950,7 +950,9 @@ class ShapExplainRender(VesselRender, Utilities):
 
         denominators = np.where(act_high == 1, pos_totalt, neg_totalt)
 
-        c = sv_all_actions / denominators
+        c = np.zeros_like(sv_all_actions, dtype=float)
+
+        np.divide(sv_all_actions, denominators, out=c, where=denominators!=0)  # Avoid division by zero
         
         # sv_action: shape (8, 14)
         # c:          shape (8,)
@@ -2141,7 +2143,9 @@ class ShapRender(Window):
 
         denominators = np.where(act_high == 1, pos_totalt, neg_totalt)
 
-        c = sv_all_actions / denominators
+        c = np.zeros_like(sv_all_actions, dtype=float)
+
+        np.divide(sv_all_actions, denominators, out=c, where=denominators!=0)  # Avoid division by zero
         
         # sv_action: shape (8, 14)
         # c:          shape (8,)
