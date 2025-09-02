@@ -56,7 +56,7 @@ def heading_true(psi_d, psi_err):
 
 # ------------------------------------------------------------------ main
 def main(kind):
-    run_number = 12
+    run_number = 14
     df         = pd.read_csv(
         "../data/runs/real/data_test_spline_20250528_123940.csv"
     )
@@ -84,7 +84,7 @@ def main(kind):
     fig, ax = plt.subplots(figsize=(10, 4.8))
 
     ax.plot(x_d, y_d, lw=2, label=f"Reference ({kind})")
-    ax.plot(x_n, y_n, lw=2, label="Realised path")
+    #ax.plot(x_n, y_n, lw=2, label="Realised path")
     if len(ctrl_pts):
         ax.scatter(ctrl_pts[:, 0], ctrl_pts[:, 1],
                    marker="x", s=80, label="Control points")
@@ -240,6 +240,7 @@ def main(kind):
     ax1.set_ylabel(r'$\hat{u}_t$ [m/s]', fontsize=14*scale)
     ax1.tick_params(axis='x', labelsize=10*scale)
     ax1.tick_params(axis='y', labelsize=10*scale)
+    ax1.set_ylim(-0.1,0.7)
     mark_episode2(render_start, render_end, episode_interval, ax1)
 
     ax2.axhline(y=0, color='gray', linestyle='--', linewidth=1.5*scale,label=f"(y={0})")
@@ -249,6 +250,7 @@ def main(kind):
     ax2.set_ylabel(r'$\hat{v}_t$ [m/s]', fontsize=14*scale)
     ax2.tick_params(axis='x', labelsize=10*scale)
     ax2.tick_params(axis='y', labelsize=10*scale)
+    ax2.set_ylim(-0.4,0.4)
     mark_episode2(render_start, render_end, episode_interval, ax2)
 
     ax3.axhline(y=0, color='gray', linestyle='--', linewidth=1.5*scale,label=f"(y={0})")
@@ -258,6 +260,7 @@ def main(kind):
     ax3.set_ylabel(r'$\hat{r}_t$ [$^\circ$/s]', fontsize=14*scale)
     ax3.tick_params(axis='x', labelsize=10*scale)
     ax3.tick_params(axis='y', labelsize=10*scale)
+    ax3.set_ylim(-30,30)
     mark_episode2(render_start, render_end, episode_interval, ax3)
 
     plt.tight_layout()
