@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y ros-noetic-smach inetutils-ping
 
 # Now copy the supervisor package
 WORKDIR /root/catkin_ws/src
-COPY milliAmpere1_code/workspace/src/supervisor ./supervisor
+COPY external/milliampere/workspace/src/supervisor ./supervisor
 
 # Rebuild with the additional package
 WORKDIR /root/catkin_ws
@@ -15,11 +15,11 @@ RUN /bin/bash -c "source /opt/ros/noetic/setup.bash && catkin_make"
 WORKDIR /app/drl_code
 
 # Copy just requirements first to leverage caching
-COPY ./drl_code/requirements.txt .
+COPY project_mAXAI/drl_code/requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip3 install -r requirements.txt
 
 # Then copy your code
-COPY ./drl_code/ .
+COPY project_mAXAI/drl_code/ .
 
 CMD ["tail", "-f", "/dev/null"]

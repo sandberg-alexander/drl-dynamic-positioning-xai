@@ -1,13 +1,13 @@
 services:
   base:
     build:
-      context: .
-      dockerfile: Dockerfile.base
+      context: ..
+      dockerfile: docker/Dockerfile.base
     image: my-ros-base:latest
   drl:
     build:
-      context: .
-      dockerfile: Dockerfile.drl
+      context: ..
+      dockerfile: docker/Dockerfile.drl
     container_name: drl
     hostname: drl_container
     depends_on:
@@ -27,9 +27,13 @@ services:
     - ../data/gym_env:/app/gym_env:rw
     - ../data/xai_samples:/app/xai_samples:rw
     - ../data/runs:/app/runs:rw
-    - ./drl_code:/app/drl_code:rw
-    command: 'bash -c '' rm -rf /app/drl_code/milliAmpere1ROS_env && cp -r /app/gym_env/milliAmpere1ROS_env /app/drl_code/ && source /opt/ros/noetic/setup.bash && tail -f /dev/null ''
-
+    - ../project_mAXAI/drl_code:/app/drl_code:rw
+    command: >
+      bash -c '
+      rm -rf /app/drl_code/milliAmpere1ROS_env &&
+      cp -r /app/gym_env/milliAmpere1ROS_env /app/drl_code/ &&
+      source /opt/ros/noetic/setup.bash &&
+      tail -f /dev/null
       '
     networks:
     - ros_local_net
@@ -38,8 +42,8 @@ services:
     init: true
   xai:
     build:
-      context: .
-      dockerfile: Dockerfile.xai
+      context: ..
+      dockerfile: docker/Dockerfile.xai
     container_name: xai
     hostname: xai_container
     depends_on:
@@ -59,9 +63,13 @@ services:
     - ../data/gym_env:/app/gym_env:rw
     - ../data/xai_samples:/app/xai_samples:rw
     - ../data/runs:/app/runs:rw
-    - ./xai_code:/app/xai_code:rw
-    command: 'bash -c '' rm -rf /app/xai_code/milliAmpere1ROS_env && cp -r /app/gym_env/milliAmpere1ROS_env /app/xai_code/ && source /opt/ros/noetic/setup.bash && tail -f /dev/null ''
-
+    - ../project_mAXAI/xai_code:/app/xai_code:rw
+    command: >
+      bash -c '
+      rm -rf /app/xai_code/milliAmpere1ROS_env &&
+      cp -r /app/gym_env/milliAmpere1ROS_env /app/xai_code/ &&
+      source /opt/ros/noetic/setup.bash &&
+      tail -f /dev/null
       '
     networks:
     - ros_local_net
@@ -69,7 +77,9 @@ services:
     - /dev/dri:/dev/dri
     init: true
   simulator_local:
-    build: ./milliAmpere1_code
+    build:
+      context: ..
+      dockerfile: external/milliampere/Dockerfile
     container_name: simulator_local
     hostname: simulator_local_container
     environment:
@@ -82,12 +92,18 @@ services:
     - QT_X11_NO_MITSHM=1
     - NVIDIA_VISIBLE_DEVICES=all
     - NVIDIA_DRIVER_CAPABILITIES=all
-    command: 'bash -c '' source /opt/ros/noetic/setup.bash && roscore & sleep 5 && source /workspace/devel/setup.bash && roslaunch /workspace/src/simulator.launch & tail -f /dev/null ''
-
+    command: >
+      bash -c '
+      source /opt/ros/noetic/setup.bash &&
+      roscore &
+      sleep 5 &&
+      source /workspace/devel/setup.bash &&
+      roslaunch /workspace/src/simulator.launch &
+      tail -f /dev/null
       '
     volumes:
-    - ./milliAmpere1_code/workspace:/workspace:rw
-    - ./milliAmpere1_code/logging:/logging:rw
+    - ../external/milliampere/workspace:/workspace:rw
+    - ../external/milliampere/logging:/logging:rw
     - /tmp/.X11-unix:/tmp/.X11-unix:rw
     - ${HOME}/.Xauthority:/root/.Xauthority:rw
     ports:

@@ -1,16 +1,17 @@
 # docker-compose-template.yml (For Laptop Generation)
+# Build context is the repo root (..)
 services:
 
   base:
     build:
-      context: .
-      dockerfile: Dockerfile.base
+      context: ..
+      dockerfile: docker/Dockerfile.base
     image: my-ros-base:latest
 
   drl:
     build:
-      context: .
-      dockerfile: Dockerfile.drl
+      context: ..
+      dockerfile: docker/Dockerfile.drl
     container_name: drl
     hostname: drl_container
     depends_on:
@@ -31,7 +32,7 @@ services:
       - ../data/gym_env:/app/gym_env:rw
       - ../data/xai_samples:/app/xai_samples:rw
       - ../data/runs:/app/runs:rw
-      - ./drl_code:/app/drl_code:rw
+      - ../project_mAXAI/drl_code:/app/drl_code:rw
     command: >
       bash -c '
       rm -rf /app/drl_code/milliAmpere1ROS_env &&
@@ -47,8 +48,8 @@ services:
 
   xai:
     build:
-      context: .
-      dockerfile: Dockerfile.xai
+      context: ..
+      dockerfile: docker/Dockerfile.xai
     container_name: xai
     hostname: xai_container
     depends_on:
@@ -69,7 +70,7 @@ services:
       - ../data/gym_env:/app/gym_env:rw
       - ../data/xai_samples:/app/xai_samples:rw
       - ../data/runs:/app/runs:rw
-      - ./xai_code:/app/xai_code:rw
+      - ../project_mAXAI/xai_code:/app/xai_code:rw
     command: >
       bash -c '
       rm -rf /app/xai_code/milliAmpere1ROS_env &&
@@ -86,7 +87,9 @@ services:
   # --- Definition for LOCAL simulator ---
   # This whole service will be REMOVED by the script for remote mode
   simulator_local:
-    build: ./milliAmpere1_code
+    build:
+      context: ..
+      dockerfile: external/milliampere/Dockerfile
     container_name: simulator_local
     hostname: simulator_local_container
     environment:
@@ -109,8 +112,8 @@ services:
       tail -f /dev/null
       '
     volumes:
-      - "./milliAmpere1_code/workspace:/workspace:rw"
-      - "./milliAmpere1_code/logging:/logging:rw"
+      - "../external/milliampere/workspace:/workspace:rw"
+      - "../external/milliampere/logging:/logging:rw"
       - "/tmp/.X11-unix:/tmp/.X11-unix:rw"
       - "${HOME}/.Xauthority:/root/.Xauthority:rw"
     ports:

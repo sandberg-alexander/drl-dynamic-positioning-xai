@@ -5,11 +5,11 @@ FROM my-ros-base:latest
 WORKDIR /app/xai_code
 
 # Copy just requirements first to leverage caching
-COPY ./xai_code/requirements.txt .
+COPY project_mAXAI/xai_code/requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip3 install -r requirements.txt
 
 # Then copy your code
-COPY ./xai_code/ .
+COPY project_mAXAI/xai_code/ .
 
 CMD ["tail", "-f", "/dev/null"]

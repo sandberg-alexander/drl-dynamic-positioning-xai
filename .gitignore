@@ -1,4 +1,47 @@
-env/
-__pycache__/
+# Legacy copy targets
 project_mAXAI/drl_code/milliAmpere1ROS_env/
 project_mAXAI/xai_code/milliAmpere1ROS_env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# Virtual environments
+env/
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Testing / Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Linting
+.ruff_cache/
+.mypy_cache/
+
+# Generated outputs
+local_env/plots/
+data/runs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker/.env.local

@@ -19,10 +19,10 @@ RUN apt-get update && apt-get install -y \
 
 # Set up the ROS workspace with common packages
 WORKDIR /root/catkin_ws/src
-COPY milliAmpere1_code/workspace/src/custom_msgs ./custom_msgs
-COPY milliAmpere1_code/workspace/src/sim_integrator ./sim_integrator
-COPY milliAmpere1_code/workspace/src/sim_milliampere ./sim_milliampere
-COPY custom_ros_msgs ./custom_ros_msgs
+COPY external/milliampere/workspace/src/custom_msgs ./custom_msgs
+COPY external/milliampere/workspace/src/sim_integrator ./sim_integrator
+COPY external/milliampere/workspace/src/sim_milliampere ./sim_milliampere
+COPY project_mAXAI/custom_ros_msgs ./custom_ros_msgs
 
 # Build the common ROS workspace
 WORKDIR /root/catkin_ws
@@ -31,5 +31,5 @@ RUN echo "source /root/catkin_ws/devel/setup.bash" >> ~/.bashrc
 
 # Create common Python environment with frequently used packages
 WORKDIR /app
-COPY ./common_requirements.txt .
+COPY docker/common_requirements.txt .
 RUN pip3 install --no-cache-dir -r common_requirements.txt
