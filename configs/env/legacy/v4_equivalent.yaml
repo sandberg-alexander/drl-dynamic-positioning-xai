@@ -1,0 +1,28 @@
+# Legacy config equivalent to milliampere1_ros_v4.py
+# Positive-only thrust, no reset service, no angle penalty
+action_space_type: positive_only
+max_time_steps: 3000
+dt: 0.1
+
+target:
+  type: random
+  bounds: [5.0, 5.0, 180.0]
+
+reset:
+  use_service: false
+
+rewards:
+  w_gauss: 1.0
+  w_AS_gauss: 0.4
+  sigma_d: 1.0
+  sigma_psi: 250.0       # 5.0 * 50
+  sigma_AS_d: 25.0       # 5.0 * 5
+  sigma_AS_psi: 3500.0   # 70.0 * 50
+  velocity_weight: 0.1
+  thrust_weight: 0.1
+  thrust_rate_weight: 0.1
+  angle_rate_weight: 0.0
+  termination_penalty: -100.0
+
+mode_checking:
+  enabled: false

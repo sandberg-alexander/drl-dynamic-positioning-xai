@@ -15,7 +15,12 @@ RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     x11-apps \
     fontconfig \
+    curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Install uv (10-100x faster than pip)
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:${PATH}"
 
 # Set up the ROS workspace with common packages
 WORKDIR /root/catkin_ws/src
@@ -23,13 +28,19 @@ COPY external/milliampere/workspace/src/custom_msgs ./custom_msgs
 COPY external/milliampere/workspace/src/sim_integrator ./sim_integrator
 COPY external/milliampere/workspace/src/sim_milliampere ./sim_milliampere
 COPY project_mAXAI/custom_ros_msgs ./custom_ros_msgs
+COPY ros_packages/milliampere_env ./milliampere_env
 
 # Build the common ROS workspace
 WORKDIR /root/catkin_ws
 RUN /bin/bash -c "source /opt/ros/noetic/setup.bash && catkin_make"
 RUN echo "source /root/catkin_ws/devel/setup.bash" >> ~/.bashrc
 
-# Create common Python environment with frequently used packages
+# Install shared Python packages
 WORKDIR /app
 COPY docker/common_requirements.txt .
-RUN pip3 install --no-cache-dir -r common_requirements.txt
+RUN uv pip install --system --no-cache -r common_requirements.txt
+COPY milliampere_dp/ /app/milliampere_dp/
+RUN uv pip install --system --no-cache /app/milliampere_dp/
+
+# Copy environment configs
+COPY configs/ /app/configs/

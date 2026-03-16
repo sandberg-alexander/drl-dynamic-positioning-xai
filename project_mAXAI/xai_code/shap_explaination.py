@@ -15,7 +15,7 @@ import gymnasium as gym
 from stable_baselines3 import PPO
 from render_explaination import RenderExplaination
 from custom_ros_msgs.msg import ObservationActuatorRefPair, Mode
-import milliAmpere1ROS_env
+import milliampere_env  # noqa: F401 -- registers MilliAmpere1-v1
 
 class Agent():
     def __init__(self):

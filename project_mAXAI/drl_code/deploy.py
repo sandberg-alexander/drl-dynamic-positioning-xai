@@ -1,4 +1,4 @@
-import milliAmpere1ROS_env
+import milliampere_env  # noqa: F401 -- registers MilliAmpere1-v1
 import os
 import math
 import rospy
@@ -78,9 +78,8 @@ class DRLDeployer:
         # Load model & environment
         self.model = PPO.load("/app/models/training_20250404_165037/models/best_model.zip")
         self.env = gym.make(
-            "milliAmpere1ROS_env/MilliAmpere1ROS-v10",
-            render_mode='human',
-            max_time_steps=1_000_000,
+            "MilliAmpere1-v1",
+            config_path="/app/configs/env/legacy/v10_equivalent.yaml",
         )
         self.model.set_env(self.env)
 
@@ -209,7 +208,7 @@ class DRLDeployer:
         self._set_mode(1)
         rospy.loginfo(f"----- '1' - Testing mode: DP")
         self.pose_nr = 0
-        self.init_pose = self.env.unwrapped.target_pose
+        self.init_pose = self.env.unwrapped._target_pose
         self.data = np.zeros((self.vep_length_dp * self.test_length_dp, self.data_points))
     
     def _run_dp_test(self):
@@ -242,13 +241,13 @@ class DRLDeployer:
             self._set_mode(0)
             rospy.loginfo(f"----- '0' - DP mode")
         else:
-            self.target_msg.north = self.env.unwrapped.target_pose[0] + self.ds_north
+            self.target_msg.north = self.env.unwrapped._target_pose[0] + self.ds_north
             self.pub_target.publish(self.target_msg)
 
     def _start_spline_test(self):
         self._set_mode(3)
         rospy.loginfo(f"----- '3' - Testing mode: path-following-spline")
-        self.init_pose = self.env.unwrapped.target_pose
+        self.init_pose = self.env.unwrapped._target_pose
         self.data = np.zeros((self.test_length_spline, self.data_points))
         self.s = 0.0
 
@@ -275,7 +274,7 @@ class DRLDeployer:
         self._set_mode(4)
         rospy.loginfo(f"----- '4' - Sampling mode: action")
         self.pose_nr = 0
-        self.init_pose = self.env.unwrapped.target_pose
+        self.init_pose = self.env.unwrapped._target_pose
         self.data = np.zeros((self.sample_length_action * self.vep_length_action // 2, len(self.obs)))
         
     def _run_action_sample(self):
@@ -315,15 +314,15 @@ class DRLDeployer:
         self.obs_act_msg.n_x2d_prev, self.obs_act_msg.n_y2d_prev = obs[8], obs[9]
         self.obs_act_msg.n_x3d_prev, self.obs_act_msg.n_y3d_prev = obs[10], obs[11]
         self.obs_act_msg.n_x4d_prev, self.obs_act_msg.n_y4d_prev = obs[12], obs[13]
-        thrusters = self.env.unwrapped.thrusters
-        angles = self.env.unwrapped.angles
+        thrusters = self.env.unwrapped._thrusters
+        angles = self.env.unwrapped._angles
         self.obs_act_msg.n_d1, self.obs_act_msg.alpha_d1 = thrusters[0], angles[0]
         self.obs_act_msg.n_d2, self.obs_act_msg.alpha_d2 = thrusters[1], angles[1]
         self.obs_act_msg.n_d3, self.obs_act_msg.alpha_d3 = thrusters[2], angles[2]
         self.obs_act_msg.n_d4, self.obs_act_msg.alpha_d4 = thrusters[3], angles[3]
-        self.obs_act_msg.target_x = self.env.unwrapped.target_pose[0]
-        self.obs_act_msg.target_y = self.env.unwrapped.target_pose[1]
-        self.obs_act_msg.target_heading = self.env.unwrapped.target_pose[2]
+        self.obs_act_msg.target_x = self.env.unwrapped._target_pose[0]
+        self.obs_act_msg.target_y = self.env.unwrapped._target_pose[1]
+        self.obs_act_msg.target_heading = self.env.unwrapped._target_pose[2]
         self.obs_act_msg.time_step = self.time_step
         self.pub_obs_act.publish(self.obs_act_msg)
 

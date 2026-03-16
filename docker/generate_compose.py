@@ -80,7 +80,9 @@ def generate_laptop_compose(mode, remote_ip=None, local_ip=None):
         use_docker_network = True
         dependency_target = f"- {LOCAL_SIM_SERVICE_NAME}"
         print("Local mode selected.")
-        print("ROS_IP will be unset (using Docker bridge network DNS).")
+        print(
+            "ROS_IP will be unset (containers use Docker bridge network with ROS_HOSTNAME)."
+        )
         print(f"ROS Master URI: {ros_master_uri}")
 
     elif mode == "remote":

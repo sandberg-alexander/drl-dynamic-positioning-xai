@@ -2,7 +2,8 @@
 
 # Same imports as before...
 import os
-import milliAmpere1ROS_env
+import rospy
+import milliampere_env  # noqa: F401 -- registers MilliAmpere1-v1
 from stable_baselines3 import PPO
 import gymnasium as gym
 from stable_baselines3.common.monitor import Monitor
@@ -130,7 +131,9 @@ def evaluate_one_model(model_path, tracker, eval_dir, n_eval_episodes=10):
 
         # --- Create Environment ---
         print(f"Creating environment instance for model {model_name}...")
-        env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v5", render_mode='human', max_time_steps=1000)
+        if not rospy.core.is_initialized():
+            rospy.init_node('drl_eval', anonymous=True)
+        env = gym.make("MilliAmpere1-v1", config_path="/app/configs/env/legacy/v5_equivalent.yaml")
         print("Environment created.")
         os.makedirs(temp_dir, exist_ok=True)
 

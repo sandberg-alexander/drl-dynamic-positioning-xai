@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 
-# Fix the import - use the correct capitalization
-import milliAmpere1ROS_env
+import signal
+import sys
+
+import rospy
+import milliampere_env  # noqa: F401 -- registers MilliAmpere1-v1
 from stable_baselines3 import PPO
 import gymnasium as gym
 from datetime import datetime
@@ -10,6 +13,23 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import BaseCallback
 import os
 import numpy as np
+
+
+_interrupted = False
+
+
+def _handle_sigint(signum, frame):
+    """Set interrupt flag on first Ctrl+C, force exit on second."""
+    global _interrupted
+    if _interrupted:
+        print("\nForced exit.")
+        sys.exit(1)
+    _interrupted = True
+    print("\nInterrupted — stopping after current step...")
+
+
+signal.signal(signal.SIGINT, _handle_sigint)
+
 
 # Create a custom callback to save models after policy updates
 class SaveModelCallback(BaseCallback):
@@ -28,45 +48,53 @@ class SaveModelCallback(BaseCallback):
         self.save_interval = save_interval
         self.save_path = save_path
         self.policy_update_count = 0
-        
+
     def _on_rollout_end(self):
         """This method is called after collecting rollout data but before updating the policy"""
         self.policy_update_count += 1
-        
+
         if self.policy_update_count % self.save_interval == 0:
             # Save the model with timestamp and update count
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             model_path = f"{self.save_path}/PPO_{timestamp}_steps_{self.num_timesteps}_update_{self.policy_update_count}"
             self.model.save(model_path)
-            
+
             if self.verbose > 0:
                 print(f"Saved model at {model_path}")
-                
+
                 # Log the current average reward based on recent episodes
                 if len(self.model.ep_info_buffer) > 0:
                     mean_reward = np.mean([ep_info["r"] for ep_info in self.model.ep_info_buffer])
                     print(f"Current mean reward: {mean_reward:.2f}")
-        
+
         return True
-    
+
     def _on_step(self):
-        """Called at every step"""
+        """Called at every step. Return False to stop training on Ctrl+C."""
+        if _interrupted:
+            return False
         return True
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="DRL training for milliAmpere1 DP")
+    parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"],
+                        help="Device for training (default: auto, which uses CPU for MlpPolicy)")
+    args = parser.parse_args()
+
     print("""
     ### ___T_ ################################################
-       | n n |                   _      ____  ____  _         
-       |__E__|      _ __ ___    / \    |  _ \|  _ \| |        
-    >===]__o[===<  | '_ ` _ \  / _ \   | | | | |_) | |        
-        [o__]      | | | | | |/ ___ \  | |_| |  _ <| |___     
+       | n n |                   _      ____  ____  _
+       |__E__|      _ __ ___    / \    |  _ \|  _ \| |
+    >===]__o[===<  | '_ ` _ \  / _ \   | | | | |_) | |
+        [o__]      | | | | | |/ ___ \  | |_| |  _ <| |___
         /7 [|      |_| |_| |_/_/   \_\ |____/|_| \_\_____| v.1
-      \/7  [|_     train.py                                           
+      \/7  [|_     train.py
     ##########################################################
 
     Starting DRL training in clean environment ...
     """)
-    
+
     # Create a timestamped directory for this training run
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_dir = f"/app/models/training_{timestamp}"
@@ -79,20 +107,22 @@ def main():
     
     print(f"Training run directory created at: {run_dir}")
     
-    # Create and monitor the environment
-    # Make sure the environment ID matches exactly what's registered
-    env = gym.make("milliAmpere1ROS_env/MilliAmpere1ROS-v9", render_mode='human', max_time_steps=1000)
+    # Init ROS node before creating env (RosTransport no longer does this)
+    rospy.init_node('drl_train', anonymous=True)
+
+    # Create environment with config-driven architecture
+    env = gym.make("MilliAmpere1-v1", config_path="/app/configs/env/legacy/v9_equivalent.yaml")
     
     # Monitor with logs in the run-specific directory
     env = Monitor(env, filename=f"{logs_dir}")
     
     # Setup model with explicitly defined hyperparameters
     model = PPO(
-        "MlpPolicy", 
-        env, 
+        "MlpPolicy",
+        env,
         n_steps=2048,
-        verbose=1, 
-        device='cuda'
+        verbose=1,
+        device=args.device,
     )
     
     # Setup callback for saving after policy updates

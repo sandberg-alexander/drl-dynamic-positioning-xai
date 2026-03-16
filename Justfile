@@ -8,9 +8,10 @@ default:
 # Full dev environment setup
 setup: install setup-hooks submodule-init
 
-# Install milliampere_dp in editable mode with dev deps
+# Install milliampere_dp and milliampere_env in editable mode with dev deps
 install:
     cd milliampere_dp && uv pip install -e ".[dev,plot]"
+    uv pip install -e ros_packages/milliampere_env
 
 # Install pre-commit hooks
 setup-hooks:
@@ -22,9 +23,16 @@ submodule-init:
 
 # --- Testing ---
 
-# Run unit tests (host, no ROS needed)
+# Run milliampere_dp unit tests (host, no ROS needed)
 test:
     cd milliampere_dp && python -m pytest
+
+# Run milliampere_env tests (host, uses MockTransport, no ROS needed)
+test-env:
+    python -m pytest ros_packages/milliampere_env/tests/
+
+# Run all tests
+test-all: test test-env
 
 # Run tests with coverage
 test-cov:

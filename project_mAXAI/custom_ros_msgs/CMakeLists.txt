@@ -12,6 +12,7 @@ add_message_files(
   Observation.msg
   ObservationActuatorRefPair.msg
   Mode.msg
+  EnvState.msg
 )
 
 generate_messages(
