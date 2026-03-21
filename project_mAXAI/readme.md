@@ -92,7 +92,7 @@ This will open a black screen that takes in inputs, which is described in the te
 ## Starting XAI Dashboard
 To start the Dashboard, make sure the simulator is running, is in DRL mode and the agent is deployed. Then go to the xai container and do
 ```bash
-python3 shap_explaination.py
+python3 shap_explanation.py
 ```
 This will open the Dashboard. The same inputs in the deploy window can be done in the dashboard.
 

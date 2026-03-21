@@ -172,14 +172,16 @@ def main() -> None:
         target_psi = msg.target_pose[2]
         _draw_target(screen, target_psi, rect_width, rect_height, width, height)
 
-        # 3. Agent vessel (blue filled rectangle)
+        # 3. Agent vessel (blue filled rectangle) — use NED-frame error for positioning
         agent_pos = np.array(
             [
-                int(width // 2) - msg.epsilon[1] * resolution,
-                int(height // 2) + msg.epsilon[0] * resolution,
+                int(width // 2)
+                - msg.epsilon_ned[1] * resolution,  # East error → screen X
+                int(height // 2)
+                + msg.epsilon_ned[0] * resolution,  # North error → screen Y (inverted)
             ]
         )
-        agent_psi = target_psi - msg.epsilon[2]
+        agent_psi = target_psi - msg.epsilon_ned[2]
         _draw_agent(screen, agent_pos, agent_psi, rect_width, rect_height)
 
         # 4. Distance circle (10m termination boundary)

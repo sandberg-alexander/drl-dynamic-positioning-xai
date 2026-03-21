@@ -213,6 +213,7 @@ class RosTransport(VesselTransport):
             return
         msg = self._EnvState()
         msg.epsilon = state_dict["epsilon"]
+        msg.epsilon_ned = state_dict["epsilon_ned"]
         msg.est_velocity = state_dict["est_velocity"]
         msg.target_pose = state_dict["target_pose"]
         msg.thrusters = state_dict["thrusters"]

@@ -224,6 +224,7 @@ class MilliAmpereEnv(gym.Env):
         self.transport.publish_env_state(
             {
                 "epsilon": self._epsilon.tolist(),
+                "epsilon_ned": self._epsilon_ned.tolist(),
                 "est_velocity": self._est_nu.tolist(),
                 "target_pose": self._target_pose.tolist(),
                 "thrusters": self._thrusters.tolist(),

@@ -44,6 +44,12 @@ test-cov:
 lint:
     pre-commit run --all-files
 
+# --- Evaluation (Docker) ---
+
+# Evaluate all models in a training run (runs inside drl container)
+evaluate-all run_dir episodes="5":
+    docker exec drl bash -c 'source /root/catkin_ws/devel/setup.bash && python3 /app/drl_code/eval.py --dir {{run_dir}} --episodes {{episodes}} --all'
+
 # --- Docker ---
 
 # Generate docker-compose for local simulation
@@ -54,13 +60,17 @@ compose-local:
 compose-remote remote_ip:
     cd docker && python3 generate_compose.py remote --remote-ip {{remote_ip}}
 
-# Build all Docker images
-build:
-    docker compose -f docker/docker-compose.yml build
+# Build all Docker images (pass extra args like --no-cache)
+build *args:
+    docker compose -f docker/docker-compose.yml -f docker/docker-compose.nvidia.yml build {{args}}
 
-# Start containers
+# Start containers (software rendering, works everywhere)
 up:
     docker compose -f docker/docker-compose.yml up -d
+
+# Start containers with NVIDIA GPU acceleration (requires nvidia-container-toolkit)
+up-gpu:
+    docker compose -f docker/docker-compose.yml -f docker/docker-compose.nvidia.yml up -d
 
 # Stop containers
 down:

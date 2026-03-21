@@ -23,6 +23,9 @@ float32 alpha_d4
 float32 target_x
 float32 target_y
 float32 target_heading
+float32 x_ned_err
+float32 y_ned_err
+float32 psi_ned_err
 float32 time_step
 
 

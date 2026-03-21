@@ -17,11 +17,6 @@ services:
     - DISPLAY=${DISPLAY}
     - QT_X11_NO_MITSHM=1
     - ROS_MASTER_URI=http://simulator_local:11311
-    - ROS_HOSTNAME=drl
-    - NVIDIA_VISIBLE_DEVICES=all
-    - NVIDIA_DRIVER_CAPABILITIES=all
-    - __GLX_VENDOR_LIBRARY_NAME=nvidia
-    - __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json
     volumes:
     - ${HOME}/.Xauthority:/root/.Xauthority:rw
     - /tmp/.X11-unix:/tmp/.X11-unix:rw
@@ -33,23 +28,11 @@ services:
     - ../configs:/app/configs:ro
     - ../milliampere_dp/src/milliampere_dp:/usr/local/lib/python3.8/dist-packages/milliampere_dp:ro
     - ../ros_packages/milliampere_env/src/milliampere_env:/root/catkin_ws/src/milliampere_env/src/milliampere_env:ro
-    command: >
-      bash -c '
-      source /root/catkin_ws/devel/setup.bash &&
-      source /opt/ros/noetic/setup.bash &&
-      tail -f /dev/null
+    command: 'bash -c '' source /root/catkin_ws/devel/setup.bash && source /opt/ros/noetic/setup.bash && tail -f /dev/null ''
+
       '
     networks:
     - ros_local_net
-    devices:
-    - /dev/dri:/dev/dri
-    deploy:
-      resources:
-        reservations:
-          devices:
-          - driver: nvidia
-            count: all
-            capabilities: [gpu, compute, utility, graphics]
     init: true
   xai:
     build:
@@ -64,11 +47,6 @@ services:
     - DISPLAY=${DISPLAY}
     - QT_X11_NO_MITSHM=1
     - ROS_MASTER_URI=http://simulator_local:11311
-    - ROS_HOSTNAME=xai
-    - NVIDIA_VISIBLE_DEVICES=all
-    - NVIDIA_DRIVER_CAPABILITIES=all
-    - __GLX_VENDOR_LIBRARY_NAME=nvidia
-    - __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json
     volumes:
     - ${HOME}/.Xauthority:/root/.Xauthority:rw
     - /tmp/.X11-unix:/tmp/.X11-unix:rw
@@ -80,23 +58,11 @@ services:
     - ../configs:/app/configs:ro
     - ../milliampere_dp/src/milliampere_dp:/usr/local/lib/python3.8/dist-packages/milliampere_dp:ro
     - ../ros_packages/milliampere_env/src/milliampere_env:/root/catkin_ws/src/milliampere_env/src/milliampere_env:ro
-    command: >
-      bash -c '
-      source /root/catkin_ws/devel/setup.bash &&
-      source /opt/ros/noetic/setup.bash &&
-      tail -f /dev/null
+    command: 'bash -c '' source /root/catkin_ws/devel/setup.bash && source /opt/ros/noetic/setup.bash && tail -f /dev/null ''
+
       '
     networks:
     - ros_local_net
-    devices:
-    - /dev/dri:/dev/dri
-    deploy:
-      resources:
-        reservations:
-          devices:
-          - driver: nvidia
-            count: all
-            capabilities: [gpu, compute, utility, graphics]
     init: true
   simulator_local:
     build: ../external/milliampere
@@ -110,17 +76,8 @@ services:
     - ROS_MASTER_URI=http://simulator_local:11311
     - CATKIN_ENABLE_TESTING='0'
     - QT_X11_NO_MITSHM=1
-    - NVIDIA_VISIBLE_DEVICES=all
-    - NVIDIA_DRIVER_CAPABILITIES=all
-    command: >
-      bash -c '
-      source /opt/ros/noetic/setup.bash &&
-      cd /workspace && catkin_make &&
-      roscore &
-      sleep 5 &&
-      source /workspace/devel/setup.bash &&
-      roslaunch /workspace/src/simulator.launch &
-      tail -f /dev/null
+    command: 'bash -c '' source /opt/ros/noetic/setup.bash && cd /workspace && catkin_make && roscore & sleep 5 && source /workspace/devel/setup.bash && roslaunch /workspace/src/simulator.launch & tail -f /dev/null ''
+
       '
     volumes:
     - ../external/milliampere/workspace:/workspace:rw

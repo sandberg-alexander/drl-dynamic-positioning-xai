@@ -5,6 +5,7 @@ import sys
 
 import rospy
 import milliampere_env  # noqa: F401 -- registers MilliAmpere1-v1
+from milliampere_dp import __version__
 from stable_baselines3 import PPO
 import gymnasium as gym
 from datetime import datetime
@@ -64,7 +65,9 @@ class SaveModelCallback(BaseCallback):
 
                 # Log the current average reward based on recent episodes
                 if len(self.model.ep_info_buffer) > 0:
-                    mean_reward = np.mean([ep_info["r"] for ep_info in self.model.ep_info_buffer])
+                    mean_reward = np.mean(
+                        [ep_info["r"] for ep_info in self.model.ep_info_buffer]
+                    )
                     print(f"Current mean reward: {mean_reward:.2f}")
 
         return True
@@ -75,20 +78,26 @@ class SaveModelCallback(BaseCallback):
             return False
         return True
 
+
 def main():
     import argparse
+
     parser = argparse.ArgumentParser(description="DRL training for milliAmpere1 DP")
-    parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"],
-                        help="Device for training (default: auto, which uses CPU for MlpPolicy)")
+    parser.add_argument(
+        "--device",
+        default="auto",
+        choices=["auto", "cpu", "cuda"],
+        help="Device for training (default: auto, which uses CPU for MlpPolicy)",
+    )
     args = parser.parse_args()
 
-    print("""
+    print(f"""
     ### ___T_ ################################################
        | n n |                   _      ____  ____  _
        |__E__|      _ __ ___    / \    |  _ \|  _ \| |
     >===]__o[===<  | '_ ` _ \  / _ \   | | | | |_) | |
         [o__]      | | | | | |/ ___ \  | |_| |  _ <| |___
-        /7 [|      |_| |_| |_/_/   \_\ |____/|_| \_\_____| v.1
+        /7 [|      |_| |_| |_/_/   \_\ |____/|_| \_\_____| v{__version__}
       \/7  [|_     train.py
     ##########################################################
 
@@ -100,22 +109,24 @@ def main():
     run_dir = f"/app/models/training_{timestamp}"
     models_dir = f"{run_dir}/models"
     logs_dir = f"{run_dir}/logs"
-    
+
     # Create directories
     os.makedirs(models_dir, exist_ok=True)
     os.makedirs(logs_dir, exist_ok=True)
-    
+
     print(f"Training run directory created at: {run_dir}")
-    
+
     # Init ROS node before creating env (RosTransport no longer does this)
-    rospy.init_node('drl_train', anonymous=True)
+    rospy.init_node("drl_train", anonymous=True)
 
     # Create environment with config-driven architecture
-    env = gym.make("MilliAmpere1-v1", config_path="/app/configs/env/legacy/v9_equivalent.yaml")
-    
+    env = gym.make(
+        "MilliAmpere1-v1", config_path="/app/configs/env/legacy/v9_equivalent.yaml"
+    )
+
     # Monitor with logs in the run-specific directory
     env = Monitor(env, filename=f"{logs_dir}")
-    
+
     # Setup model with explicitly defined hyperparameters
     model = PPO(
         "MlpPolicy",
@@ -124,11 +135,11 @@ def main():
         verbose=1,
         device=args.device,
     )
-    
+
     # Setup callback for saving after policy updates
     # Save every 2 policy updates to the run-specific models directory
     save_callback = SaveModelCallback(save_interval=2, save_path=models_dir)
-    
+
     try:
         # Start training without evaluation
         model.learn(total_timesteps=500000, callback=save_callback, progress_bar=True)
@@ -144,5 +155,6 @@ def main():
         print(f"Final model saved at {final_path}")
         env.close()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

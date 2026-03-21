@@ -4,6 +4,6 @@ repos:
     hooks:
       - id: ruff-check
         args: [--fix]
-        exclude: "^(project_mAXAI/|data/|local_env/)"
+        exclude: "^(data/|local_env/)"
       - id: ruff-format
-        exclude: "^(project_mAXAI/|data/|local_env/)"
+        exclude: "^(data/|local_env/)"
