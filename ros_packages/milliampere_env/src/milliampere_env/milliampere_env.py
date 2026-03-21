@@ -324,6 +324,7 @@ class MilliAmpereEnv(gym.Env):
     def _compute_reward(self) -> float:
         d = np.sqrt(self._epsilon[0] ** 2 + self._epsilon[1] ** 2)
         epsilon_psi = self._epsilon[2]
+        assert self._norm_observation is not None
         norm_u, norm_v, norm_r = self._norm_observation[3:6]
         rc = self.config.rewards
 

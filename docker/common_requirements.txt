@@ -1,5 +1,6 @@
-setuptools
-numpy>=1.20
-scipy
-pydantic>=2.0
-pyyaml>=6.0
+setuptools>=68.0,<80
+numpy>=1.20,<3
+scipy>=1.7,<2
+pydantic>=2.0,<3
+eval-type-backport>=0.2.0
+pyyaml>=6.0,<7

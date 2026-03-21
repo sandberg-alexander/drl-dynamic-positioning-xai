@@ -1,0 +1,20 @@
+{
+  "typeCheckingMode": "basic",
+  "pythonVersion": "3.10",
+  "include": [
+    "milliampere_dp/src",
+    "drl/src",
+    "xai/src",
+    "ros_packages/milliampere_env/src"
+  ],
+  "exclude": [
+    "**/.venv",
+    "data/",
+    "external/",
+    "xai/src/milliampere_xai/dashboard.py",
+    "milliampere_dp/src/milliampere_dp/plotting/"
+  ],
+  "reportMissingImports": "warning",
+  "reportMissingTypeStubs": false,
+  "reportUnusedImport": false
+}

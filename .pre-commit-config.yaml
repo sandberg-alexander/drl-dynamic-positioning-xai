@@ -7,3 +7,9 @@ repos:
         exclude: "^(data/|xai/src/milliampere_xai/dashboard\\.py)"
       - id: ruff-format
         exclude: "^(data/|xai/src/milliampere_xai/dashboard\\.py)"
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.13.9
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]

@@ -4,21 +4,22 @@ build-backend = "hatchling.build"
 
 [project]
 name = "milliampere-drl"
-version = "0.4.0"
+version = "0.5.0"
 description = "DRL training, evaluation, and deployment for milliAmpere1 DP"
 requires-python = ">=3.8"
 license = "MIT"
 dependencies = [
     "milliampere-dp>=0.4.0",
     "stable-baselines3>=2.3,<3",
-    "tensorboard>=2.10",
-    "tqdm>=4.60",
-    "rich>=12.0",
+    "tensorboard>=2.10,<3",
+    "tqdm>=4.60,<5",
+    "rich>=12.0,<14",
     "gymnasium>=0.28,<0.30",
-    "numpy>=1.20",
-    "scipy>=1.7",
-    "pyyaml>=6.0",
-    "pydantic>=2.0",
+    "numpy>=1.20,<3",
+    "scipy>=1.7,<2",
+    "pyyaml>=6.0,<7",
+    "pydantic>=2.0,<3",
+    "eval-type-backport>=0.2.0; python_version < '3.10'",
 ]
 
 [project.optional-dependencies]
@@ -29,6 +30,9 @@ dev = ["pytest>=7.0", "pytest-cov>=4.0"]
 drl-train = "milliampere_drl.train:main"
 drl-evaluate = "milliampere_drl.evaluate:main"
 drl-deploy = "milliampere_drl.deploy:main"
+
+[tool.uv.sources]
+milliampere-dp = { path = "../milliampere_dp" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/milliampere_drl"]

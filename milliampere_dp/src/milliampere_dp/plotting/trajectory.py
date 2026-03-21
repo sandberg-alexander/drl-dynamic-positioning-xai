@@ -182,7 +182,7 @@ def draw_angular_velocity_arc(
         theta1, theta2 = 0.0, 360.0 - arc_span
 
     arc = Arc(
-        [x, y],
+        (x, y),
         radius,
         radius,
         angle=base_angle,

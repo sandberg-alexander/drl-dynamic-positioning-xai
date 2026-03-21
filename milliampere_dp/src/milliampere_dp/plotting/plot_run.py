@@ -87,7 +87,7 @@ def _rotate_body2ned(psi):
 def drawCirc(ax, radius, centX, centY, angle_, theta1_, theta2_, color_="black"):
     # ========Line
     arc = Arc(
-        [centX, centY],
+        (centX, centY),
         radius,
         radius,
         angle=angle_,

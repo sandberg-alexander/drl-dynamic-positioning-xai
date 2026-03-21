@@ -1,0 +1,20 @@
+# Model manifest -- maps training runs to environment configurations.
+# Legacy runs (2025) predate config-snapshotting. New runs (2026+) have
+# env_config.yaml and training_config.yaml in their run directories.
+
+models:
+  project_thesis_model:
+    description: "Final thesis model, deployed on real milliAmpere1 vessel"
+    env_config: configs/env/legacy/v10_equivalent.yaml
+
+  training_20250328_131443:
+    description: "MilliAmpere1ROS-v3, uni PC, no reset service"
+    env_config: configs/env/legacy/v4_equivalent.yaml
+
+  training_20250328_145357:
+    description: "MilliAmpere1ROS-v2, laptop, with reset service"
+    env_config: configs/env/legacy/v4_equivalent.yaml
+
+  training_20250404_165037:
+    description: "MilliAmpere1ROS-v4, uni PC, no reset service"
+    env_config: configs/env/legacy/v5_equivalent.yaml

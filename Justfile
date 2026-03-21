@@ -15,9 +15,10 @@ install:
     cd drl && uv pip install -e ".[dev]"
     cd xai && uv pip install -e ".[dev]"
 
-# Install pre-commit hooks
+# Install pre-commit hooks (lint + commit message validation)
 setup-hooks:
     pre-commit install
+    pre-commit install --hook-type commit-msg
 
 # Init git submodules
 submodule-init:
@@ -41,18 +42,26 @@ test-drl:
 test-xai:
     cd xai && python -m pytest
 
+# Run integration tests (full DRL episode with MockTransport)
+test-integration:
+    python -m pytest tests/integration/ -v --tb=short
+
 # Run all tests
-test-all: test test-env test-drl test-xai
+test-all: test test-env test-drl test-xai test-integration
 
 # Run tests with coverage
 test-cov:
     cd milliampere_dp && python -m pytest --cov=milliampere_dp --cov-report=term-missing
 
-# --- Linting ---
+# --- Linting & Type Checking ---
 
 # Run pre-commit checks on all files
 lint:
     pre-commit run --all-files
+
+# Run pyright type checking
+type-check:
+    pyright
 
 # --- Evaluation (Docker) ---
 
@@ -100,6 +109,20 @@ up-gpu:
 # Stop containers
 down:
     docker compose -f docker/docker-compose.yml down
+
+# --- Release ---
+
+# Bump version, update CHANGELOG.md, and create git tag (e.g. just release minor)
+release increment="PATCH":
+    .venv/bin/cz bump --increment {{increment}} --yes
+
+# Preview what the next version bump would produce
+release-dry increment="PATCH":
+    .venv/bin/cz bump --dry-run --increment {{increment}} --yes
+
+# Generate changelog without bumping
+changelog:
+    .venv/bin/cz changelog
 
 # --- Cleanup ---
 

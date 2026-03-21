@@ -1,7 +1,3 @@
-# Legacy copy targets (removed in Phase 4)
-# project_mAXAI/drl_code/milliAmpere1ROS_env/
-# project_mAXAI/xai_code/milliAmpere1ROS_env/
-
 # Python
 __pycache__/
 *.py[cod]
@@ -38,6 +34,11 @@ htmlcov/
 # Generated outputs
 local_env/plots/
 data/runs/
+
+# Training artifacts (new runs are not tracked)
+# Legacy 2025 runs are already in git history.
+# New runs (2026+) include config snapshots + model binaries.
+data/models/training_*/
 
 # OS
 .DS_Store

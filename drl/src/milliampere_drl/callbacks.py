@@ -40,13 +40,10 @@ class SaveModelCallback(BaseCallback):
             if self.verbose > 0:
                 print(f"Saved model at {model_path}")
 
-                if len(self.model.ep_info_buffer) > 0:
-                    mean_reward = np.mean(
-                        [ep_info["r"] for ep_info in self.model.ep_info_buffer]
-                    )
+                buf = self.model.ep_info_buffer
+                if buf is not None and len(buf) > 0:
+                    mean_reward = np.mean([ep_info["r"] for ep_info in buf])
                     print(f"Current mean reward: {mean_reward:.2f}")
-
-        return True
 
     def _on_step(self) -> bool:
         if self._interrupted:
@@ -58,12 +55,18 @@ class HParamCallback(BaseCallback):
     """Log hyperparameters to TensorBoard HPARAMS tab on training start."""
 
     def _on_training_start(self) -> None:
-        hparam_dict = {
+        hparam_dict: dict[str, bool | str | float | None] = {
             "algorithm": self.model.__class__.__name__,
-            "learning_rate": self.model.learning_rate,
-            "gamma": self.model.gamma,
-            "n_steps": self.model.n_steps,
+            "learning_rate": (
+                float(self.model.learning_rate)
+                if isinstance(self.model.learning_rate, float)
+                else str(self.model.learning_rate)
+            ),
         }
+        if hasattr(self.model, "gamma"):
+            hparam_dict["gamma"] = self.model.gamma  # type: ignore[attr-defined]
+        if hasattr(self.model, "n_steps"):
+            hparam_dict["n_steps"] = self.model.n_steps  # type: ignore[attr-defined]
         if hasattr(self.model, "seed") and self.model.seed is not None:
             hparam_dict["seed"] = self.model.seed
 

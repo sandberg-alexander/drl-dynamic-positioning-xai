@@ -78,14 +78,14 @@ def evaluate_one_model(
             obs, info = env.reset(seed=episode_seed)
             done = False
             truncated = False
-            episode_reward = 0
+            episode_reward = 0.0
             episode_length = 0
 
             while not (done or truncated):
                 action, _ = model.predict(obs, deterministic=True)
                 obs, reward, terminated, truncated, info = env.step(action)
                 done = terminated
-                episode_reward += reward
+                episode_reward += float(reward)
                 episode_length += 1
 
             print(

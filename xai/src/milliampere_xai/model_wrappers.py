@@ -22,17 +22,20 @@ class Obs2ActionWrapper(torch.nn.Module):
 
 
 class Obs2ValueWrapper(torch.nn.Module):
-    """Extract the value network from an SB3 PPO model for SHAP."""
+    """Extract the value network from an SB3 PPO model for SHAP.
+
+    Skips the FlattenExtractor (which contains nn.Flatten that
+    SHAP's DeepExplainer doesn't recognise) and feeds observations
+    directly into the MLP — valid for MlpPolicy with 1-D observations.
+    """
 
     def __init__(self, model) -> None:
         super().__init__()
-        self.features_extractor = model.policy.features_extractor
-        self.mlp_extractor = model.policy.mlp_extractor
+        self.mlp_extractor = model.policy.mlp_extractor.value_net
         self.value_net = model.policy.value_net
 
     def forward(self, obs: torch.Tensor) -> torch.Tensor:
-        features = self.features_extractor(obs)
-        _latent_pi, latent_vf = self.mlp_extractor(features)
+        latent_vf = self.mlp_extractor(obs)
         return self.value_net(latent_vf)
 
 

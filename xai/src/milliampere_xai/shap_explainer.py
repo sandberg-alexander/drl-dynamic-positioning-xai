@@ -188,8 +188,8 @@ def main():
     # Define models and environments
     model = PPO.load(model_path, device="cpu")
     env = gym.make("MilliAmpere1-v1", config_path=env_config)
-    action_low = env.action_space.low
-    action_high = env.action_space.high
+    action_low = env.action_space.low  # type: ignore[attr-defined]
+    action_high = env.action_space.high  # type: ignore[attr-defined]
     obs2action_model = Obs2ActionWrapper(model)
     obs2value_model = Obs2ValueWrapper(model)
 
@@ -239,7 +239,7 @@ def main():
     # Video recording setup (actual surface size captured when writer is created)
     video_dir = f"{data_path}video"
     os.makedirs(video_dir, exist_ok=True)
-    fourcc = cv2.VideoWriter_fourcc(*"MJPG")
+    fourcc = cv2.VideoWriter_fourcc(*"MJPG")  # type: ignore[attr-defined]
     video_ext = ".avi"
     video_writer = None
 
@@ -326,10 +326,12 @@ def main():
             shap_values_value = explainer_value.shap_values(obs_tensor)
 
             shap_values_action_list = [
-                arr.flatten().tolist() for arr in shap_values_action
+                arr.flatten().tolist()  # type: ignore[union-attr]
+                for arr in shap_values_action
             ]
             shap_values_value_list = [
-                arr.flatten().tolist() for arr in shap_values_value
+                arr.flatten().tolist()  # type: ignore[union-attr]
+                for arr in shap_values_value
             ][0]
 
             tot_thrust, tot_angle, tot_angular_thrust = combine_actuator_ref(

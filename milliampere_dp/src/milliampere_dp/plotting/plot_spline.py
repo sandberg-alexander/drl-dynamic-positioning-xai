@@ -763,7 +763,7 @@ def plot_spline(csv_path, output_dir, kind, run_number):
     def drawCirc(ax, radius, centX, centY, angle_, theta1_, theta2_, color_="black"):
         # ========Line
         arc = Arc(
-            [centX, centY],
+            (centX, centY),
             radius,
             radius,
             angle=angle_,

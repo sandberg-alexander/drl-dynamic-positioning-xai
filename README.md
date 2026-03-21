@@ -159,7 +159,7 @@ docker exec -it drl bash -c 'source /root/catkin_ws/devel/setup.bash && drl-trai
 docker exec -it drl bash -c 'source /root/catkin_ws/devel/setup.bash && drl-train --config /app/configs/training/default.yaml'
 
 # Override device
-docker exec -it drl bash -c 'source /root/catkin_ws/devel/setup.bash && drl-train --device cpu'
+docker exec -it drl bash -c 'source /root/catkin_ws/devel/setup.bash && drl-train --device cuda'
 ```
 
 Training creates a timestamped directory under `/app/models/` containing:
@@ -258,23 +258,31 @@ docker exec simulator_local bash -c 'source /workspace/devel/setup.bash && rosse
 gust: 5.0"'
 ```
 
+## CI/CD
+
+GitHub Actions runs on every push to `main` and `rework/*` branches:
+- **Lint** -- ruff check + format, pyright type checking (basic mode)
+- **Test** -- all unit tests + integration tests (168 unit + 3 integration)
+
 ## Development
 
 ### Run tests (no Docker needed)
 
 ```bash
-just test           # milliampere_dp (69 tests)
-just test-env       # milliampere_env (54 tests, uses MockTransport)
-just test-drl       # milliampere_drl (37 tests)
-just test-xai       # milliampere_xai (8 tests)
-just test-all       # all 168 tests
-just test-cov       # milliampere_dp with coverage
+just test               # milliampere_dp (69 tests)
+just test-env           # milliampere_env (54 tests, uses MockTransport)
+just test-drl           # milliampere_drl (37 tests)
+just test-xai           # milliampere_xai (8 tests)
+just test-integration   # full DRL episode with MockTransport (3 tests)
+just test-all           # all tests
+just test-cov           # milliampere_dp with coverage
 ```
 
-### Lint and format
+### Lint, format, and type check
 
 ```bash
-just lint           # ruff check + format via pre-commit
+just lint           # ruff check + format + pyright via pre-commit
+just type-check     # pyright only (0 errors expected, warnings OK for ROS imports)
 ```
 
 ### Live editing in Docker
@@ -301,6 +309,12 @@ Every training run snapshots its config into the run directory for reproducibili
 ### Adding a new environment variant
 
 Create a YAML file in `configs/env/` following the existing examples. All scripts use `MilliAmpere1-v1` with a `config_path` argument - no code changes needed.
+
+### Model management
+
+Model binaries (`.zip` files) are **not tracked in git**. Training runs produce artifacts in `data/models/` which are gitignored. Each training run automatically snapshots its config into the run directory.
+
+Legacy models (pre-2026) are preserved in git history. See `data/models/manifest.yaml` for a mapping of legacy training runs to their environment configurations.
 
 ## milliAmpere1 simulator
 

@@ -1,0 +1,11 @@
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.5.0"
+tag_format = "v$version"
+update_changelog_on_bump = true
+version_files = [
+    "milliampere_dp/pyproject.toml:version",
+    "drl/pyproject.toml:version",
+    "xai/pyproject.toml:version",
+    "ros_packages/milliampere_env/setup.py:version",
+]
