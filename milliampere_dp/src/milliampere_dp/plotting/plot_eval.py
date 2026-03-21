@@ -1,11 +1,14 @@
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
+from __future__ import annotations
+
+import argparse
 import glob
 import os
 import re
 import traceback
-import argparse  # For specifying the directory easily
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
 
 def plot_evaluation_rewards(
@@ -53,13 +56,15 @@ def plot_evaluation_rewards(
 
             if "r" not in monitor_data.columns:
                 print(
-                    f"Warning: 'r' (reward) column not found in {monitor_csv_path}. Skipping."
+                    f"Warning: 'r' (reward) column not found "
+                    f"in {monitor_csv_path}. Skipping."
                 )
                 continue
 
             if monitor_data.empty:
                 print(
-                    f"Warning: {monitor_csv_path} is empty after skipping header. Skipping."
+                    f"Warning: {monitor_csv_path} is empty "
+                    f"after skipping header. Skipping."
                 )
                 continue
 
@@ -72,16 +77,21 @@ def plot_evaluation_rewards(
                 steps = int(match.group(1))
                 results.append((steps, mean_reward, model_name))
                 print(
-                    f"Processed {model_name}: Steps={steps}, Mean Reward={mean_reward:.2f}"
+                    f"Processed {model_name}: "
+                    f"Steps={steps}, "
+                    f"Mean Reward={mean_reward:.2f}"
                 )
             else:
                 print(
-                    f"Warning: Could not extract steps from model name '{model_name}'. Skipping."
+                    f"Warning: Could not extract steps "
+                    f"from model name '{model_name}'. "
+                    f"Skipping."
                 )
 
         except pd.errors.EmptyDataError:
             print(
-                f"Warning: {monitor_csv_path} contained no data or only headers. Skipping."
+                f"Warning: {monitor_csv_path} contained "
+                f"no data or only headers. Skipping."
             )
         except Exception as e:
             print(f"Error processing {monitor_csv_path}: {e}")
@@ -97,7 +107,6 @@ def plot_evaluation_rewards(
     # Unpack sorted results for plotting
     steps_array = np.array([res[0] for res in results])
     mean_rewards_array = np.array([res[1] for res in results])
-    model_names = [res[2] for res in results]  # Keep model names if needed later
 
     # --- Plotting ---
     print("\nGenerating plot...")
@@ -110,7 +119,7 @@ def plot_evaluation_rewards(
     # Handle multiple best models if they have the same mean reward
     best_model_steps = steps_array[best_model_indices]
 
-    fig, ax = plt.subplots()  # Adjust figure size as needed
+    fig, ax = plt.subplots()
 
     # Plot bars for mean rewards
     ax.bar(
@@ -118,7 +127,7 @@ def plot_evaluation_rewards(
         mean_rewards_array,
         color=colors,
         width=np.min(np.diff(steps_array)) * 0.8 if len(steps_array) > 1 else 10000,
-    )  # Adjust bar width
+    )
 
     # Highlight the best model(s) with a star
     ax.plot(
@@ -130,7 +139,7 @@ def plot_evaluation_rewards(
         label=f"Best Mean Reward ({best_mean_reward:.2f})",
     )
 
-    # Optional: Add a line for maximum possible reward if known (e.g., 1000 from your example)
+    # Optional: Add a line for maximum possible reward if known
     max_possible_reward = 1000
     ax.axhline(
         y=max_possible_reward,
@@ -141,11 +150,9 @@ def plot_evaluation_rewards(
 
     ax.set_xlabel("Training Steps", fontsize=14 * scale)
     ax.set_ylabel("Mean Evaluation Reward", fontsize=14 * scale)
-    # ax.set_title(f'Mean Evaluation Reward vs Training Steps\n(Run: {os.path.basename(run_dir)})', fontsize=16*scale)
-    ax.tick_params(axis="x", labelsize=10 * scale)  # Rotate labels if needed
+    ax.tick_params(axis="x", labelsize=10 * scale)
     ax.tick_params(axis="y", labelsize=10 * scale)
     ax.legend(fontsize=10 * scale)
-    # ax.grid(axis='y', linestyle='--') # Add grid lines for better readability
 
     plt.tight_layout()
 
@@ -164,27 +171,28 @@ def plot_evaluation_rewards(
     plt.close(fig)
 
 
-# --- Main execution block ---
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(
         description="Plot average evaluation rewards for a training run."
     )
-    # Make run_dir argument mandatory
     parser.add_argument(
         "--dir",
         dest="run_dir",
         type=str,
         required=True,
-        help="Path to the main training run directory (e.g., ../data/models/training_20250328_145357)",
+        help="Path to the main training run directory",
     )
     parser.add_argument(
         "--output",
         dest="output_file",
         type=str,
-        default="plots/drl/eval/evaluation_rewards_2_r.pdf",
-        help="Output filename for the plot (e.g., evaluation_rewards.pdf)",
+        default="plots/drl/eval/evaluation_rewards.pdf",
+        help="Output filename for the plot",
     )
 
     args = parser.parse_args()
-
     plot_evaluation_rewards(args.run_dir, args.output_file)
+
+
+if __name__ == "__main__":
+    main()

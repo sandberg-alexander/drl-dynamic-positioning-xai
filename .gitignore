@@ -1,6 +1,6 @@
-# Legacy copy targets
-project_mAXAI/drl_code/milliAmpere1ROS_env/
-project_mAXAI/xai_code/milliAmpere1ROS_env/
+# Legacy copy targets (removed in Phase 4)
+# project_mAXAI/drl_code/milliAmpere1ROS_env/
+# project_mAXAI/xai_code/milliAmpere1ROS_env/
 
 # Python
 __pycache__/

@@ -378,7 +378,8 @@ class MilliAmpereEnv(gym.Env):
 
     def _check_truncated(self) -> bool:
         if self._time_step >= self.config.max_time_steps:
-            logger.info("Truncated at step %d", self._time_step)
+            if self._time_step == self.config.max_time_steps:
+                logger.info("Truncated at step %d", self._time_step)
             return True
         return False
 

@@ -1,11 +1,11 @@
-##### Plot figures
-######
+from __future__ import annotations
 
-import os
 import argparse
-import pandas as pd
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 
 def main():
@@ -35,7 +35,7 @@ def main():
     r = monitor_data["r"]
     e = np.arange(len(r))
     t = monitor_data["t"]
-    l = monitor_data["l"]
+    ep_lengths = monitor_data["l"]
 
     colors = ["green" if val >= 0 else "red" for val in r]
 
@@ -91,7 +91,7 @@ def main():
 
     fig, ax = plt.subplots()
 
-    ax.bar(e, l, color="blue")
+    ax.bar(e, ep_lengths, color="blue")
     ax.axhline(
         y=args.max_reward,
         color="black",

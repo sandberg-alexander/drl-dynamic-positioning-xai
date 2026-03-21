@@ -1,14 +1,14 @@
-import pygame
-import numpy as np
-from enum import Enum
 import math
+from enum import Enum
 
+import numpy as np
+import pygame
 from milliampere_dp.vessel import (
-    VESSEL_LENGTH,
-    VESSEL_BEAM,
+    MAX_THRUSTER_RPM,
     THRUSTER_ARM_X,
     THRUSTER_ARM_Y,
-    MAX_THRUSTER_RPM,
+    VESSEL_BEAM,
+    VESSEL_LENGTH,
 )
 
 ###########################################################################################################

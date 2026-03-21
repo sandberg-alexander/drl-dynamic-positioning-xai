@@ -2,4 +2,6 @@
 
 from milliampere_dp.plotting.episodes import mark_episodes
 
-__all__ = ["mark_episodes"]
+__all__ = [
+    "mark_episodes",
+]

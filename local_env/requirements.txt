@@ -1,5 +1,0 @@
-ipykernel
-pygame
-pandas
-matplotlib
-scipy

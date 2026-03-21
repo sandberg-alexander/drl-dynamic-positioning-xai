@@ -1,6 +1,4 @@
 setuptools
-stable-baselines3[extra]==2.3.2
-gymnasium>=0.28.2,<0.30
 numpy>=1.20
 scipy
 pydantic>=2.0

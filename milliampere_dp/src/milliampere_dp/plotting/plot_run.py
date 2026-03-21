@@ -3,22 +3,22 @@ from __future__ import annotations
 import argparse
 import os
 
-import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
-from matplotlib.patches import Rectangle, Arc, RegularPolygon
 import matplotlib.transforms as transforms
-from numpy import radians as rad
+import numpy as np
+import pandas as pd
 from matplotlib.lines import Line2D
+from matplotlib.patches import Arc, Rectangle, RegularPolygon
+from numpy import radians as rad
 
+from milliampere_dp.plotting.episodes import mark_episodes
 from milliampere_dp.vessel import (
+    MAX_ANGULAR_SPEED,
     MAX_DISTANCE,
     MAX_HEADING_ANGLE,
     MAX_LINEAR_SPEED,
-    MAX_ANGULAR_SPEED,
     MAX_THRUSTER_RPM,
 )
-from milliampere_dp.plotting.episodes import mark_episodes
 
 
 def load_data(csv_path):
@@ -908,7 +908,7 @@ def plot_xy_thruster(data, render_start, render_end, run_number, output_dir):
         legend_handles.append(thrust_handle)
 
         # Linear Speed Vector
-        linear_speed = np.hypot(u[t], v[t])
+        _linear_speed = np.hypot(u[t], v[t])
         dx = u[t] * np.cos(np.deg2rad(-psi[t])) - v[t] * np.sin(np.deg2rad(-psi[t]))
         dy = u[t] * np.sin(np.deg2rad(-psi[t])) + v[t] * np.cos(np.deg2rad(-psi[t]))
         scale_factor = 2 * np.pi / 3.5
@@ -946,7 +946,7 @@ def plot_xy_thruster(data, render_start, render_end, run_number, output_dir):
         plt.close(fig)
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Plot run data from CSV")
     parser.add_argument("--csv", required=True, help="Path to input CSV file")
     parser.add_argument(
@@ -1119,3 +1119,7 @@ if __name__ == "__main__":
     plot_xy_thruster(
         data, args.render_start, args.render_end, args.run_number, args.output_dir
     )
+
+
+if __name__ == "__main__":
+    main()

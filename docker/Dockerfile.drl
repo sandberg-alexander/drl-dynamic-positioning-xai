@@ -12,13 +12,9 @@ COPY external/milliampere/workspace/src/supervisor ./supervisor
 WORKDIR /root/catkin_ws
 RUN /bin/bash -c "source /opt/ros/noetic/setup.bash && catkin_make"
 
-WORKDIR /app/drl_code
-
-# Copy just requirements first to leverage caching
-COPY project_mAXAI/drl_code/requirements.txt .
-RUN uv pip install --system --no-cache -r requirements.txt
-
-# Then copy your code
-COPY project_mAXAI/drl_code/ .
+# Install milliampere_drl package (milliampere_dp already at /app/milliampere_dp/ from base)
+WORKDIR /app
+COPY drl/ /app/drl/
+RUN uv pip install --system --no-cache /app/milliampere_dp/ /app/drl/ pygame
 
 CMD ["tail", "-f", "/dev/null"]

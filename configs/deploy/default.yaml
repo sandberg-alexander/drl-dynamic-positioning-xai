@@ -1,0 +1,2 @@
+model_path: /app/models/training_20250404_165037/models/best_model.zip
+env_config: configs/env/legacy/v10_equivalent.yaml

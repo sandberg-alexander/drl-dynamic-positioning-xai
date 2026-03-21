@@ -34,7 +34,7 @@ services:
       - ../data/models:/app/models:rw
       - ../data/xai_samples:/app/xai_samples:rw
       - ../data/runs:/app/runs:rw
-      - ../project_mAXAI/drl_code:/app/drl_code:rw
+      - ../drl/src/milliampere_drl:/usr/local/lib/python3.8/dist-packages/milliampere_drl:ro
       - ../configs:/app/configs:ro
       - ../milliampere_dp/src/milliampere_dp:/usr/local/lib/python3.8/dist-packages/milliampere_dp:ro
       - ../ros_packages/milliampere_env/src/milliampere_env:/root/catkin_ws/src/milliampere_env/src/milliampere_env:ro
@@ -69,7 +69,7 @@ services:
       - ../data/models:/app/models:rw
       - ../data/xai_samples:/app/xai_samples:rw
       - ../data/runs:/app/runs:rw
-      - ../project_mAXAI/xai_code:/app/xai_code:rw
+      - ../xai/src/milliampere_xai:/usr/local/lib/python3.8/dist-packages/milliampere_xai:ro
       - ../configs:/app/configs:ro
       - ../milliampere_dp/src/milliampere_dp:/usr/local/lib/python3.8/dist-packages/milliampere_dp:ro
       - ../ros_packages/milliampere_env/src/milliampere_env:/root/catkin_ws/src/milliampere_env/src/milliampere_env:ro

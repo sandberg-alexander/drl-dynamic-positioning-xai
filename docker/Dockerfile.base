@@ -27,7 +27,7 @@ WORKDIR /root/catkin_ws/src
 COPY external/milliampere/workspace/src/custom_msgs ./custom_msgs
 COPY external/milliampere/workspace/src/sim_integrator ./sim_integrator
 COPY external/milliampere/workspace/src/sim_milliampere ./sim_milliampere
-COPY project_mAXAI/custom_ros_msgs ./custom_ros_msgs
+COPY ros_packages/custom_ros_msgs ./custom_ros_msgs
 COPY ros_packages/milliampere_env ./milliampere_env
 
 # Build the common ROS workspace

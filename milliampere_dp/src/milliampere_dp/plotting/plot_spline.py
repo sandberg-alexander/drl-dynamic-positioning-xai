@@ -1,21 +1,18 @@
-"""
-combined_plot.py – reference (spline *or* straight line) vs. realised path
-"""
+"""Plot reference path (spline or straight line) vs realised path."""
 
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import matplotlib.transforms as transforms
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from pathlib import Path
-from scipy.interpolate import CubicSpline
-import math
-import argparse
-
-from matplotlib.patches import Rectangle
-import matplotlib.transforms as transforms
-from matplotlib.patches import Arc, RegularPolygon
-from numpy import radians as rad
 from matplotlib.lines import Line2D
-import time
+from matplotlib.patches import Arc, Rectangle, RegularPolygon
+from numpy import radians as rad
+from scipy.interpolate import CubicSpline
 
 
 # ------------------------------------------------------------------ helpers
@@ -55,7 +52,7 @@ def heading_true(psi_d, psi_err):
 
 
 # ------------------------------------------------------------------ main
-def main(csv_path, output_dir, kind, run_number):
+def plot_spline(csv_path, output_dir, kind, run_number):
     df = pd.read_csv(csv_path)
 
     # log → body-frame errors
@@ -112,14 +109,14 @@ def main(csv_path, output_dir, kind, run_number):
     u = df["u"] * 3.24
     v = df["v"] * 3.24
     r = df["r"] * 112.6
-    n1x = df["n1x"] * 900
-    n1y = df["n1y"] * 900
-    n2x = df["n2x"] * 900
-    n2y = df["n2y"] * 900
-    n3x = df["n3x"] * 900
-    n3y = df["n3y"] * 900
-    n4x = df["n4x"] * 900
-    n4y = df["n4y"] * 900
+    _n1x = df["n1x"] * 900
+    _n1y = df["n1y"] * 900
+    _n2x = df["n2x"] * 900
+    _n2y = df["n2y"] * 900
+    _n3x = df["n3x"] * 900
+    _n3y = df["n3y"] * 900
+    _n4x = df["n4x"] * 900
+    _n4y = df["n4y"] * 900
     n1 = df["n1d"]
     alpha1 = df["alpha1d"]
     n2 = df["n2d"]
@@ -146,8 +143,9 @@ def main(csv_path, output_dir, kind, run_number):
                 # Add a gray vertical span for these 200 time steps
                 ax.axvspan(start, end, facecolor="gray", alpha=0.2)
             else:
-                # Else leave it white or add another color if you like
-                # ax.axvspan(start, end, facecolor='white', alpha=1.0)  # Typically unnecessary if background is white by default
+                # Else leave it white or add another color
+                # ax.axvspan(start, end,
+                #            facecolor='white', alpha=1.0)
                 pass
 
             # Flip the flag for the next iteration
@@ -167,8 +165,9 @@ def main(csv_path, output_dir, kind, run_number):
                 # Add a gray vertical span for these 200 time steps
                 ax.axvspan(start, end, facecolor="gray", alpha=0.2)
             else:
-                # Else leave it white or add another color if you like
-                # ax.axvspan(start, end, facecolor='white', alpha=1.0)  # Typically unnecessary if background is white by default
+                # Else leave it white or add another color
+                # ax.axvspan(start, end,
+                #            facecolor='white', alpha=1.0)
                 pass
 
             # Flip the flag for the next iteration
@@ -185,7 +184,8 @@ def main(csv_path, output_dir, kind, run_number):
     # States
     fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 4.8 * 2))
 
-    # ax1.axhline(y=0, color='red', linestyle='--', linewidth=1.5*scale,label=f"(y={0})")
+    # ax1.axhline(y=0, color='red', linestyle='--',
+    #             linewidth=1.5*scale, label=f"(y={0})")
     ax1.plot(
         x_d, color="red", linestyle="--", linewidth=1.5 * scale, label="Desired pose"
     )
@@ -203,9 +203,14 @@ def main(csv_path, output_dir, kind, run_number):
     ax1.tick_params(axis="y", labelsize=10 * scale)
     mark_episode2(render_start, render_end, episode_interval, ax1)
 
-    # ax2.axhline(y=0, color='red', linestyle='--', linewidth=1.5*scale,label=f"(y={0})")
+    # ax2.axhline(y=0, color='red', linestyle='--',
+    #             linewidth=1.5*scale, label=f"(y={0})")
     ax2.plot(
-        y_d, color="red", linestyle="--", linewidth=1.5 * scale, label="Desired pose"
+        y_d,
+        color="red",
+        linestyle="--",
+        linewidth=1.5 * scale,
+        label="Desired pose",
     )
     ax2.plot(
         dt[render_start:render_end],
@@ -221,9 +226,14 @@ def main(csv_path, output_dir, kind, run_number):
     ax2.tick_params(axis="y", labelsize=10 * scale)
     mark_episode2(render_start, render_end, episode_interval, ax2)
 
-    # ax3.axhline(y=0, color='red', linestyle='--', linewidth=1.5*scale,label=f"(y={0})")
+    # ax3.axhline(y=0, color='red', linestyle='--',
+    #             linewidth=1.5*scale, label=f"(y={0})")
     ax3.plot(
-        psi_d, color="red", linestyle="--", linewidth=1.5 * scale, label="Desired pose"
+        psi_d,
+        color="red",
+        linestyle="--",
+        linewidth=1.5 * scale,
+        label="Desired pose",
     )
     ax3.plot(
         dt[render_start:render_end],
@@ -813,7 +823,8 @@ def main(csv_path, output_dir, kind, run_number):
             )
 
         return legend_element
-        # ax.set_xlim([centX-radius,centY+radius]) and ax.set_ylim([centY-radius,centY+radius])
+        # ax.set_xlim([centX-radius, centY+radius])
+        # ax.set_ylim([centY-radius, centY+radius])
         # Make sure you keep the axes scaled or else arrow will distort
 
     for a in range(20):
@@ -824,7 +835,11 @@ def main(csv_path, output_dir, kind, run_number):
         print(xy)
         ax.axhline(y=0, color="gray", linestyle="--", label=f"(y={0})")
         ax.axvline(x=0, color="gray", linestyle="--")
-        # ax.plot(y[render_start+k+offset:render_start+offset+201],x[render_start+k+offset:render_start+offset+201], color='red')
+        # ax.plot(
+        #     y[render_start+k+offset:render_start+offset+201],
+        #     x[render_start+k+offset:render_start+offset+201],
+        #     color='red',
+        # )
         ax.set_xlabel(r"$y^n$", fontsize=14)
         ax.set_ylabel(r"$x^n$", fontsize=14)
         ax.tick_params(axis="x", labelsize=10)
@@ -946,7 +961,7 @@ def main(csv_path, output_dir, kind, run_number):
         legend_handles.append(thrust_handle)
         # Linear Speed Vector
         print(f"u: {u[t]}, v: {v[t]}, r: {r[t]}")
-        linear_speed = np.hypot(u[t], v[t])  # Compute linear speed magnitude
+        _linear_speed = np.hypot(u[t], v[t])  # noqa: F841
         dx = u[t] * np.cos(np.deg2rad(-psi[t])) - v[t] * np.sin(
             np.deg2rad(-psi[t])
         )  # x-component of the linear velocity
@@ -988,7 +1003,7 @@ def main(csv_path, output_dir, kind, run_number):
         plt.close(fig)
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(
         description="Plot spline reference vs realised path."
     )
@@ -1014,4 +1029,8 @@ if __name__ == "__main__":
         help="run number used in output filenames (default: 1)",
     )
     args = parser.parse_args()
-    main(args.csv, args.output_dir, args.kind, args.run_number)
+    plot_spline(args.csv, args.output_dir, args.kind, args.run_number)
+
+
+if __name__ == "__main__":
+    main()

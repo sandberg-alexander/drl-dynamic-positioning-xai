@@ -4,6 +4,6 @@ repos:
     hooks:
       - id: ruff-check
         args: [--fix]
-        exclude: "^(data/|local_env/)"
+        exclude: "^(data/|xai/src/milliampere_xai/dashboard\\.py)"
       - id: ruff-format
-        exclude: "^(data/|local_env/)"
+        exclude: "^(data/|xai/src/milliampere_xai/dashboard\\.py)"

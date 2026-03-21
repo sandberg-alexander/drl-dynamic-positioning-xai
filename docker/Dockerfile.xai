@@ -1,14 +1,9 @@
-# Dockerfile.xai (simplified version)
+# Dockerfile.xai
 FROM my-ros-base:latest
 
-
-WORKDIR /app/xai_code
-
-# Copy just requirements first to leverage caching
-COPY project_mAXAI/xai_code/requirements.txt .
-RUN uv pip install --system --no-cache -r requirements.txt
-
-# Then copy your code
-COPY project_mAXAI/xai_code/ .
+# Install milliampere_xai package (milliampere_dp already at /app/milliampere_dp/ from base)
+WORKDIR /app
+COPY xai/ /app/xai/
+RUN uv pip install --system --no-cache /app/milliampere_dp/ /app/xai/
 
 CMD ["tail", "-f", "/dev/null"]

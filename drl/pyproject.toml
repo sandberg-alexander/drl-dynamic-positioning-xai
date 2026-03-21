@@ -3,30 +3,35 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "milliampere-dp"
+name = "milliampere-drl"
 version = "0.4.0"
-description = "Shared domain library for milliAmpere1 dynamic positioning"
+description = "DRL training, evaluation, and deployment for milliAmpere1 DP"
 requires-python = ">=3.8"
 license = "MIT"
 dependencies = [
+    "milliampere-dp>=0.4.0",
+    "stable-baselines3>=2.3,<3",
+    "tensorboard>=2.10",
+    "tqdm>=4.60",
+    "rich>=12.0",
+    "gymnasium>=0.28,<0.30",
     "numpy>=1.20",
     "scipy>=1.7",
     "pyyaml>=6.0",
-    "matplotlib>=3.5",
-    "pandas>=1.4",
+    "pydantic>=2.0",
 ]
 
 [project.optional-dependencies]
+wandb = ["wandb>=0.16"]
 dev = ["pytest>=7.0", "pytest-cov>=4.0"]
 
 [project.scripts]
-plot-eval = "milliampere_dp.plotting.plot_eval:main"
-plot-monitored = "milliampere_dp.plotting.plot_monitored_data:main"
-plot-run = "milliampere_dp.plotting.plot_run:main"
-plot-spline = "milliampere_dp.plotting.plot_spline:main"
+drl-train = "milliampere_drl.train:main"
+drl-evaluate = "milliampere_drl.evaluate:main"
+drl-deploy = "milliampere_drl.deploy:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/milliampere_dp"]
+packages = ["src/milliampere_drl"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

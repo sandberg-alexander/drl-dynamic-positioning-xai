@@ -1,0 +1,11 @@
+seed: 42
+env_config: configs/env/dp_positive_thrust.yaml
+policy: MlpPolicy
+n_steps: 2048
+total_timesteps: 500000
+learning_rate: 0.0003
+batch_size: 64
+n_epochs: 10
+gamma: 0.99
+device: cpu
+save_interval: 2

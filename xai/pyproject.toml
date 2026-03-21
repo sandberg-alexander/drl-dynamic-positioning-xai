@@ -3,30 +3,30 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "milliampere-dp"
+name = "milliampere-xai"
 version = "0.4.0"
-description = "Shared domain library for milliAmpere1 dynamic positioning"
+description = "SHAP-based XAI explainer and dashboard for milliAmpere1 DRL-DP"
 requires-python = ">=3.8"
 license = "MIT"
 dependencies = [
-    "numpy>=1.20",
-    "scipy>=1.7",
-    "pyyaml>=6.0",
-    "matplotlib>=3.5",
+    "milliampere-dp>=0.4.0",
+    "stable-baselines3>=2.3,<3",
+    "shap>=0.42",
+    "torch>=1.13",
+    "pygame>=2.0",
     "pandas>=1.4",
+    "numpy>=1.20",
+    "opencv-python>=4.5",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "pytest-cov>=4.0"]
 
 [project.scripts]
-plot-eval = "milliampere_dp.plotting.plot_eval:main"
-plot-monitored = "milliampere_dp.plotting.plot_monitored_data:main"
-plot-run = "milliampere_dp.plotting.plot_run:main"
-plot-spline = "milliampere_dp.plotting.plot_spline:main"
+xai-explain = "milliampere_xai.shap_explainer:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/milliampere_dp"]
+packages = ["src/milliampere_xai"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

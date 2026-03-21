@@ -1,35 +1,47 @@
-import rospy
-import torch
-import pygame
-import time
-import pandas as pd
+"""SHAP-based XAI explanation dashboard for milliAmpere1 DRL-DP."""
+
+from __future__ import annotations
+
+import glob
 import os
-import shap
 import signal
 import sys
-import numpy as np
-import math
-import glob
+import time
+
 import cv2
-import gymnasium as gym
-from stable_baselines3 import PPO
-from render_explanation import RenderExplanation
-from custom_ros_msgs.msg import ObservationActuatorRefPair, Mode
-from milliampere_dp import __version__
+import numpy as np
+import pandas as pd
+import pygame
+import shap
+import torch
 from milliampere_dp.vessel import (
+    MAX_ANGULAR_SPEED,
     MAX_DISTANCE,
     MAX_HEADING_ANGLE,
     MAX_LINEAR_SPEED,
-    MAX_ANGULAR_SPEED,
     MAX_THRUSTER_RPM,
     THRUSTER_ARM_X,
     THRUSTER_ARM_Y,
 )
-import milliampere_env  # noqa: F401 -- registers MilliAmpere1-v1
+
+from milliampere_xai.dashboard import RenderExplanation
+from milliampere_xai.model_wrappers import (
+    Obs2ActionWrapper,
+    Obs2ValueWrapper,
+    combine_actuator_ref,
+)
 
 
 class Agent:
+    """ROS subscriber that receives observations, actions,
+    and state from the deployer."""
+
     def __init__(self):
+        import rospy
+        from custom_ros_msgs.msg import Mode, ObservationActuatorRefPair
+
+        self._rospy = rospy
+
         self.obs = None
         self.action = None
         self.actuator_ref = None
@@ -49,7 +61,7 @@ class Agent:
         )
         rospy.Subscriber("/drl/mode", Mode, self._mode_callback)
 
-    def _mode_callback(self, msg: Mode):
+    def _mode_callback(self, msg):
         """Update mode_flag from incoming Mode message."""
         self.mode_flag = msg.mode
 
@@ -101,83 +113,31 @@ class Agent:
         return int(self.end - self.start)
 
 
-class Obs2ActionWrapper(torch.nn.Module):
-    def __init__(self, model):
-        super(Obs2ActionWrapper, self).__init__()
-        self.mlp_extractor = model.policy.mlp_extractor.policy_net
-        self.action_net = model.policy.action_net
+def _signal_handler(sig, frame):
+    """Graceful shutdown on SIGINT/SIGTERM."""
+    import rospy
 
-    def forward(self, obs):
-        x = self.mlp_extractor(obs)
-        action = self.action_net(x)
-        return action
-
-
-class Obs2ValueWrapper(torch.nn.Module):
-    def __init__(self, model):
-        super(Obs2ValueWrapper, self).__init__()
-        self.features_extractor = model.policy.features_extractor
-        self.mlp_extractor = model.policy.mlp_extractor
-        self.value_net = model.policy.value_net
-
-    def forward(self, obs):
-        features = self.features_extractor(obs)
-        latent_pi, latent_vf = self.mlp_extractor(features)
-        value = self.value_net(latent_vf)
-        return value
-
-
-def signal_handler(sig, frame):
     print("\nForced shutdown initiated. Cleaning up...")
     if not rospy.is_shutdown():
         rospy.signal_shutdown("Keyboard interrupt")
-
     try:
         rospy.sleep(0.5)
     except Exception:
         pass
-
     pygame.quit()
-
     time.sleep(2)
     os._exit(0)
 
 
-def ssa_rad(angle):
-    return (angle + np.pi) % (2 * np.pi) - np.pi
-
-
-def ssa_alt(angle):
-    if angle == -np.pi:
-        return np.pi
-    return (angle + np.pi) % (2 * np.pi) - np.pi
-
-
-def combine_actuator_ref(actuator_ref, actuator_pos):
-    thrust_x = 0
-    thrust_y = 0
-    tot_angular_thrust = 0
-    for i, ((thrust, angle), (x, y)) in enumerate(zip(actuator_ref, actuator_pos)):
-        rad = np.deg2rad(90 * (i + 1) - angle)
-        angle = angle * np.pi / 180
-
-        thrust_x += thrust * math.cos(angle)
-        thrust_y += thrust * math.sin(angle)
-
-        if x * y < 0:
-            ang_thrust = abs(x) * thrust * np.cos(rad) + abs(y) * thrust * np.sin(rad)
-        else:
-            ang_thrust = abs(x) * thrust * np.sin(rad) + abs(y) * thrust * np.cos(rad)
-        tot_angular_thrust += ang_thrust
-
-    tot_thrust = math.hypot(thrust_x, thrust_y)
-    tot_angle = math.atan2(thrust_y, thrust_x) * 180 / np.pi
-
-    return tot_thrust, tot_angle, tot_angular_thrust
-
-
 def main():
     import argparse
+
+    import gymnasium as gym
+    import milliampere_env  # noqa: F401 -- registers MilliAmpere1-v1
+    import rospy
+    from stable_baselines3 import PPO
+
+    from milliampere_xai import __version__
 
     parser = argparse.ArgumentParser(description="XAI SHAP explanation dashboard")
     parser.add_argument(
@@ -185,7 +145,14 @@ def main():
         action="store_true",
         help="Use GPU rendering (default: software rendering)",
     )
+    parser.add_argument("--model", default=None, help="Override model path")
+    parser.add_argument("--env-config", default=None, help="Override env config path")
     args = parser.parse_args()
+
+    model_path = (
+        args.model or "/app/models/training_20250404_165037/models/best_model.zip"
+    )
+    env_config = args.env_config or "/app/configs/env/legacy/v4_equivalent.yaml"
 
     if not args.gpu:
         os.environ["LIBGL_ALWAYS_SOFTWARE"] = "1"
@@ -193,39 +160,45 @@ def main():
     print(f"""
     ### ___T_ ################################################
        | n n |                   _     __  __    _    ___
-       |__E__|      _ __ ___    / \    \ \/ /   / \  |_ _|
-    >===]__o[===<  | '_ ` _ \  / _ \    \  /   / _ \  | |
-        [o__]      | | | | | |/ ___ \   /  \  / ___ \ | |
-        /7 [|      |_| |_| |_/_/   \_\ /_/\_\/_/   \_\___| v{__version__}
-      \/7  [|_     shap_explanation.py
+       |__E__|      _ __ ___    / \\    \\ \\/ /   / \\  |_ _|
+    >===]__o[===<  | '_ ` _ \\  / _ \\    \\  /   / _ \\  | |
+        [o__]      | | | | | |/ ___ \\   /  \\  / ___ \\ | |
+        /7 [|      |_| |_| |_/_/   \\_\\ /_/\\_\\/_/   \\_\\___| v{__version__}
+      \\/7  [|_     xai-explain
     ##########################################################
 
     Starting a XAI run ({"GPU" if args.gpu else "software"} rendering) ...
+
+    Keyboard controls (in dashboard window):
+          '0' - DP mode              (idle dynamic positioning)
+          '1' - DP test              (waypoint sequence, records video)
+          '2' - North following      (northward path, records video)
+          '3' - Spline following     (spline path, records video)
+          '4' - Action sampling      (collect SHAP action samples)
+          '5' - VF sampling          (collect value function samples)
     """)
 
     # Init ROS node before creating subscribers (new env no longer does this)
     rospy.init_node("xai", anonymous=True)
 
     # Signal handler
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, _signal_handler)
+    signal.signal(signal.SIGTERM, _signal_handler)
 
     # Define models and environments
-    model = PPO.load(
-        "/app/models/training_20250404_165037/models/best_model.zip", device="cpu"
-    )
-    env = gym.make(
-        "MilliAmpere1-v1", config_path="/app/configs/env/legacy/v4_equivalent.yaml"
-    )
+    model = PPO.load(model_path, device="cpu")
+    env = gym.make("MilliAmpere1-v1", config_path=env_config)
     action_low = env.action_space.low
     action_high = env.action_space.high
     obs2action_model = Obs2ActionWrapper(model)
     obs2value_model = Obs2ValueWrapper(model)
 
     # Define background and sample observations
-    # Make sure folder is made and mounted, also explore if our samples should only be leagal configurations
-    # could also see if base gets closer to 0 if do symetric positions, rather than +-. Example add 180
-    # degrees to heading insted of - heding.
+    # Make sure folder is made and mounted, also explore if
+    # our samples should only be legal configurations.
+    # Could also see if base gets closer to 0 if do symmetric
+    # positions, rather than +-. Example add 180 degrees to
+    # heading instead of -heading.
     num_random = 500
     random_obs = np.array([env.observation_space.sample() for _ in range(num_random)])
     random_obs = np.concatenate([random_obs, -random_obs])
@@ -263,9 +236,11 @@ def main():
         data_path = "/app/runs/sim/"
     else:
         data_path = "/app/runs/real/"
-    screen = pygame.display.get_surface()  # or whatever size you use
-    width, height = screen.get_size()
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # H.264 in an .mp4 file
+    # Video recording setup (actual surface size captured when writer is created)
+    video_dir = f"{data_path}video"
+    os.makedirs(video_dir, exist_ok=True)
+    fourcc = cv2.VideoWriter_fourcc(*"MJPG")
+    video_ext = ".avi"
     video_writer = None
 
     rospy.sleep(sleep_time * 3)
@@ -287,36 +262,27 @@ def main():
                         agent.mode_msg.mode = 4
                         agent.mode_flag = 4
                         agent.pub_mode.publish(agent.mode_msg)
-                    elif event.key == pygame.K_3:  # SPLINE_TEST
-                        agent.mode_msg.mode = 3
-                        agent.mode_flag = 3
+                    elif event.key in (pygame.K_1, pygame.K_2, pygame.K_3):
+                        mode_num = event.key - pygame.K_0
+                        agent.mode_msg.mode = mode_num
+                        agent.mode_flag = mode_num
                         agent.pub_mode.publish(agent.mode_msg)
+                        # Start video recording with current surface size
+                        surf = pygame.display.get_surface()
+                        w, h = surf.get_size()
                         out_fname = (
-                            f"{data_path}video/{time.strftime('%Y%m%d_%H%M%S')}.mp4"
+                            f"{video_dir}/{time.strftime('%Y%m%d_%H%M%S')}{video_ext}"
                         )
-                        video_writer = cv2.VideoWriter(
-                            out_fname, fourcc, fps, (width, height)
-                        )
-                    elif event.key == pygame.K_2:  # NORTH_TEST
-                        agent.mode_msg.mode = 2
-                        agent.mode_flag = 2
-                        agent.pub_mode.publish(agent.mode_msg)
-                        out_fname = (
-                            f"{data_path}video/{time.strftime('%Y%m%d_%H%M%S')}.mp4"
-                        )
-                        video_writer = cv2.VideoWriter(
-                            out_fname, fourcc, fps, (width, height)
-                        )
-                    elif event.key == pygame.K_1:  # DP_TEST
-                        agent.mode_msg.mode = 1
-                        agent.mode_flag = 1
-                        agent.pub_mode.publish(agent.mode_msg)
-                        out_fname = (
-                            f"{data_path}video/{time.strftime('%Y%m%d_%H%M%S')}.mp4"
-                        )
-                        video_writer = cv2.VideoWriter(
-                            out_fname, fourcc, fps, (width, height)
-                        )
+                        video_writer = cv2.VideoWriter(out_fname, fourcc, fps, (w, h))
+                        if not video_writer.isOpened():
+                            print(
+                                f"Warning: could not open video "
+                                f"writer ({w}x{h}) "
+                                f"at {out_fname}"
+                            )
+                            video_writer = None
+                        else:
+                            print(f"Recording to {out_fname} ({w}x{h})")
                     elif event.key == pygame.K_0:  # DP
                         agent.mode_msg.mode = 0
                         agent.mode_flag = 0
@@ -333,13 +299,10 @@ def main():
                 explainer_value = shap.DeepExplainer(obs2value_model, samples_torch)
                 agent.mode_msg.mode = 0
 
-            # get target heading
-            target_pose = agent.get_target_pose()
-
             # get actuator ref
             actuator_ref = agent.get_actuator_ref()
             while actuator_ref is None:
-                print("Waiting for actuator_ref ...")
+                print("Waiting for deployer data ...")
                 rospy.sleep(5)
                 actuator_ref = agent.get_actuator_ref()
 
@@ -349,6 +312,13 @@ def main():
                 print("Waiting for observations ...")
                 rospy.sleep(5)
                 obs = agent.get_observations()
+
+            # get target heading (arrives with the same callback as obs/actuator_ref)
+            target_pose = agent.get_target_pose()
+            while target_pose is None:
+                print("Waiting for target pose ...")
+                rospy.sleep(1)
+                target_pose = agent.get_target_pose()
 
             obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
 
@@ -401,15 +371,17 @@ def main():
                 break
 
             if agent.mode_msg.mode in [1, 2, 3]:
-                surface = pygame.display.get_surface()
-                frame = pygame.surfarray.array3d(surface)  # (W, H, 3) in RGB
-                frame = np.transpose(frame, (1, 0, 2))  # -> (H, W, 3)
-                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)  # OpenCV wants BGR
-
-                video_writer.write(frame)  # add frame to the file
+                if video_writer is not None:
+                    surface = pygame.display.get_surface()
+                    frame = pygame.surfarray.array3d(surface)  # (W, H, 3) in RGB
+                    frame = np.transpose(frame, (1, 0, 2))  # -> (H, W, 3)
+                    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                    video_writer.write(frame)
 
                 if agent.mode_flag == 0:
-                    video_writer.release()  # very important – flushes and closes the file
+                    if video_writer is not None:
+                        video_writer.release()
+                        video_writer = None
                     agent.mode_msg.mode = 0
 
             try:
