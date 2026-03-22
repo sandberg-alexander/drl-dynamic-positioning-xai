@@ -51,6 +51,15 @@ class RewardConfig(BaseModel):
     termination_penalty: float = Field(default=-100.0, le=0.0)
 
 
+class VelocityConfig(BaseModel):
+    """Velocity observation source configuration."""
+
+    model_config = ConfigDict(frozen=True)
+
+    use_topic: bool = True
+    topic: str = "/navigation/twist_body"
+
+
 class ModeCheckingConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -65,9 +74,11 @@ class EnvConfig(BaseModel):
     action_space_type: Literal["positive_only"] = "positive_only"
     max_time_steps: int = Field(default=3000, gt=0)
     dt: float = Field(default=0.1, gt=0.0)
+    legacy_step_sleep: float = Field(default=0.0, ge=0.0)
     target: TargetConfig = TargetConfig()
     reset: ResetConfig = ResetConfig()
     rewards: RewardConfig = RewardConfig()
+    velocity: VelocityConfig = VelocityConfig()
     mode_checking: ModeCheckingConfig = ModeCheckingConfig()
 
     @classmethod

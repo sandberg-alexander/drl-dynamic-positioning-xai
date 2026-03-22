@@ -62,6 +62,23 @@ class TestDeployConfig:
         cfg = DeployConfig()
         assert "v10_equivalent" in cfg.env_config
 
+    def test_default_paths(self):
+        cfg = DeployConfig()
+        assert cfg.data_path_sim == "/app/runs/sim/"
+        assert cfg.data_path_real == "/app/runs/real/"
+        assert cfg.xai_action_sample_path == "/app/xai_samples/action/"
+        assert cfg.xai_vf_sample_path == "/app/xai_samples/value_function/"
+
+    def test_default_test_parameters(self):
+        cfg = DeployConfig()
+        assert len(cfg.test_pose) == 4
+        assert len(cfg.sample_pose) == 4
+        assert cfg.ds_north > 0
+        assert cfg.ds_spline > 0
+        assert cfg.vep_length_action == 200
+        assert cfg.sample_length_action == 5
+        assert cfg.sample_length_vf == 1000
+
     def test_from_yaml(self, tmp_path):
         yaml_file = tmp_path / "deploy.yaml"
         yaml_file.write_text(
@@ -70,3 +87,15 @@ class TestDeployConfig:
         )
         cfg = DeployConfig.from_yaml(yaml_file)
         assert cfg.model_path == "/app/models/test.zip"
+
+    def test_from_yaml_with_new_fields(self, tmp_path):
+        yaml_file = tmp_path / "deploy.yaml"
+        yaml_file.write_text(
+            "model_path: /app/models/test.zip\n"
+            "env_config: configs/env/dp_waypoint.yaml\n"
+            "ds_north: 0.2\n"
+            "sample_length_vf: 500\n"
+        )
+        cfg = DeployConfig.from_yaml(yaml_file)
+        assert cfg.ds_north == 0.2
+        assert cfg.sample_length_vf == 500

@@ -1,2 +1,27 @@
 model_path: /app/models/training_20250404_165037/models/best_model.zip
 env_config: configs/env/legacy/v10_equivalent.yaml
+
+# Data output paths
+data_path_sim: /app/runs/sim/
+data_path_real: /app/runs/real/
+xai_action_sample_path: /app/xai_samples/action/
+xai_vf_sample_path: /app/xai_samples/value_function/
+
+# DP test parameters
+vep_length_dp: 200
+test_length_dp: 5
+
+# North test parameters
+test_length_north: 200
+ds_north: 0.1
+
+# Spline test parameters
+test_length_spline: 200
+ds_spline: 0.005
+
+# Action sample parameters
+vep_length_action: 200
+sample_length_action: 5
+
+# VF sample parameters
+sample_length_vf: 1000

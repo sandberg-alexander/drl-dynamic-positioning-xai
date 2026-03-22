@@ -49,9 +49,12 @@ test-integration:
 # Run all tests
 test-all: test test-env test-drl test-xai test-integration
 
-# Run tests with coverage
+# Run tests with coverage (all packages)
 test-cov:
     cd milliampere_dp && python -m pytest --cov=milliampere_dp --cov-report=term-missing
+    python -m pytest ros_packages/milliampere_env/tests/ --cov=milliampere_env --cov-report=term-missing
+    cd drl && python -m pytest --cov=milliampere_drl --cov-report=term-missing
+    cd xai && python -m pytest --cov=milliampere_xai --cov-report=term-missing
 
 # --- Linting & Type Checking ---
 

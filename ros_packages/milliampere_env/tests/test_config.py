@@ -29,6 +29,15 @@ class TestEnvConfigDefaults:
         config = EnvConfig()
         assert config.mode_checking.enabled is False
 
+    def test_velocity_default_uses_topic(self):
+        config = EnvConfig()
+        assert config.velocity.use_topic is True
+        assert config.velocity.topic == "/navigation/twist_body"
+
+    def test_legacy_step_sleep_default_zero(self):
+        config = EnvConfig()
+        assert config.legacy_step_sleep == 0.0
+
 
 class TestEnvConfigValidation:
     def test_negative_sigma_raises(self):
@@ -58,6 +67,8 @@ class TestEnvConfigFromYaml:
         assert config.rewards.angle_rate_weight == 0.0
         assert config.reset.use_service is False
         assert config.target.type == TargetType.random
+        assert config.velocity.use_topic is False
+        assert config.legacy_step_sleep == pytest.approx(0.15)
 
     def test_v5_loads(self, configs_dir):
         config = EnvConfig.from_yaml(configs_dir / "legacy" / "v5_equivalent.yaml")
@@ -78,6 +89,8 @@ class TestEnvConfigFromYaml:
     def test_dp_positive_thrust_loads(self, configs_dir):
         config = EnvConfig.from_yaml(configs_dir / "dp_positive_thrust.yaml")
         assert config.rewards.angle_rate_weight > 0
+        assert config.velocity.use_topic is True
+        assert config.legacy_step_sleep == 0.0
 
     def test_dp_waypoint_loads(self, configs_dir):
         config = EnvConfig.from_yaml(configs_dir / "dp_waypoint.yaml")

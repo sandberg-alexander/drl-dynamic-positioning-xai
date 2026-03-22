@@ -67,11 +67,42 @@ class DeployConfig(BaseModel):
     model_path: str = "/app/models/training_20250404_165037/models/best_model.zip"
     env_config: str = "configs/env/legacy/v10_equivalent.yaml"
 
-    # Test parameters
+    # Data output paths
+    data_path_sim: str = "/app/runs/sim/"
+    data_path_real: str = "/app/runs/real/"
+    xai_action_sample_path: str = "/app/xai_samples/action/"
+    xai_vf_sample_path: str = "/app/xai_samples/value_function/"
+
+    # DP test parameters
     vep_length_dp: int = 200
     test_length_dp: int = 5
+    test_pose: list[tuple[float, float, float]] = [
+        (4.0, 0.0, 0.0),
+        (4.0, 4.0, 0.0),
+        (0.0, 0.0, 0.0),
+        (0.0, 0.0, 3.141592653589793),
+    ]
+
+    # North test parameters
     test_length_north: int = 200
+    ds_north: float = 0.1
+
+    # Spline test parameters
     test_length_spline: int = 200
+    ds_spline: float = 0.005
+
+    # Action sample parameters
+    vep_length_action: int = 200
+    sample_length_action: int = 5
+    sample_pose: list[tuple[float, float, float]] = [
+        (4.0, 3.0, 0.5585053606381855),
+        (3.3, -1.0, -2.6005405296978888),
+        (-0.8, -3.4, -0.3316125578789226),
+        (0.0, 0.0, 0.47123889803846897),
+    ]
+
+    # VF sample parameters
+    sample_length_vf: int = 1000
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> DeployConfig:

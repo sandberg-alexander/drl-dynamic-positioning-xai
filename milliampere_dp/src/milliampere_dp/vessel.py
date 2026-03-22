@@ -35,7 +35,7 @@ THRUSTER_ARM_Y: float = 0.8  # metres from CoG along y-body
 # ---------------------------------------------------------------------------
 # Target bounds (max deviation from operating point in NED + heading)
 # ---------------------------------------------------------------------------
-TARGET_BOUNDS: np.ndarray = np.array([5.0, 5.0, 180.0])
+TARGET_BOUNDS: np.ndarray = np.array([5.0, 5.0, 180.0])  # [meters, meters, degrees]
 
 # ---------------------------------------------------------------------------
 # Thruster angle constraints (radians)

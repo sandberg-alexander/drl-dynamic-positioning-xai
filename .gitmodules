@@ -1,3 +1,4 @@
 [submodule "external/milliampere"]
 	path = external/milliampere
 	url = git@github.com:Autoferry/milliAmpere.git
+	ignore = dirty

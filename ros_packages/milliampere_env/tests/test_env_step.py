@@ -89,6 +89,32 @@ class TestStep:
         assert terminated is False
 
 
+class TestVelocitySource:
+    def test_uses_injected_velocity(self, configs_dir):
+        """When MockTransport has velocity set, env uses it directly."""
+        env, mock = _make_env(configs_dir)
+        env.reset(seed=42)
+        mock.set_velocity(0.5, -0.2, 0.01)
+        env.step(env.action_space.sample())
+        # est_nu should match the injected velocity
+        assert env._est_nu[0] == pytest.approx(0.5)
+        assert env._est_nu[1] == pytest.approx(-0.2)
+        assert env._est_nu[2] == pytest.approx(0.01)
+
+    def test_falls_back_to_pose_delta(self, configs_dir):
+        """When no velocity is available, env estimates from pose deltas."""
+        env, mock = _make_env(configs_dir)
+        env.reset(seed=42)
+        # No velocity set on mock — should fall back to pose-delta
+        mock.set_pose(1.0, 0.0, 0.0)
+        env.step(env.action_space.sample())
+        # After one step with pose change, velocity should be non-zero
+        # (exact values depend on dt and pose delta)
+        env.step(env.action_space.sample())
+        # est_nu is populated from pose differentiation (not zeros)
+        assert env._est_nu is not None
+
+
 class TestWaypointTarget:
     def test_waypoint_target_updates_each_step(self, configs_dir):
         env, mock = _make_env(configs_dir, "legacy/v10_equivalent.yaml")

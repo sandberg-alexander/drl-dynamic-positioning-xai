@@ -57,11 +57,7 @@ def main() -> None:
 
     rospy.init_node("drl_deployer", anonymous=True)
 
-    node = DRLDeployer(
-        model_path=config.model_path,
-        config_path=config.env_config,
-        device=args.device or "cpu",
-    )
+    node = DRLDeployer(config=config, device=args.device or "cpu")
     node.spin()
 
 

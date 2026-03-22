@@ -4,10 +4,21 @@ build-backend = "hatchling.build"
 
 [project]
 name = "milliampere-drl"
-version = "0.5.0"
+version = "0.6.0"
 description = "DRL training, evaluation, and deployment for milliAmpere1 DP"
 requires-python = ">=3.8"
 license = "MIT"
+authors = [{ name = "Alexander Sandberg" }]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "milliampere-dp>=0.4.0",
     "stable-baselines3>=2.3,<3",
@@ -22,6 +33,10 @@ dependencies = [
     "eval-type-backport>=0.2.0; python_version < '3.10'",
 ]
 
+[project.urls]
+Repository = "https://github.com/sandberg-alexander/drl-dynamic-positioning-xai"
+Issues = "https://github.com/sandberg-alexander/drl-dynamic-positioning-xai/issues"
+
 [project.optional-dependencies]
 wandb = ["wandb>=0.16"]
 dev = ["pytest>=7.0", "pytest-cov>=4.0"]
@@ -32,7 +47,7 @@ drl-evaluate = "milliampere_drl.evaluate:main"
 drl-deploy = "milliampere_drl.deploy:main"
 
 [tool.uv.sources]
-milliampere-dp = { path = "../milliampere_dp" }
+milliampere-dp = { workspace = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/milliampere_drl"]
@@ -50,3 +65,10 @@ select = ["E", "F", "I", "W", "UP"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
+
+[tool.coverage.run]
+source = ["milliampere_drl"]
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = ["pragma: no cover", "if __name__ == .__main__.", "if TYPE_CHECKING:"]

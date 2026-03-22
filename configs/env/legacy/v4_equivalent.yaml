@@ -3,6 +3,7 @@
 action_space_type: positive_only
 max_time_steps: 3000
 dt: 0.1
+legacy_step_sleep: 0.15  # Legacy envs had clock.tick(4) rendering (~250ms total per step)
 
 target:
   type: random
@@ -23,6 +24,9 @@ rewards:
   thrust_rate_weight: 0.1
   angle_rate_weight: 0.0
   termination_penalty: -100.0
+
+velocity:
+  use_topic: false  # Legacy envs estimated velocity from pose deltas
 
 mode_checking:
   enabled: false

@@ -1,0 +1,2 @@
+[tool.uv.workspace]
+members = ["milliampere_dp", "drl", "xai"]

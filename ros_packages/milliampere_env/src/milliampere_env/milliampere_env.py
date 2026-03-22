@@ -118,6 +118,30 @@ class MilliAmpereEnv(gym.Env):
         self._R_angle_d = 0.0
 
     # ------------------------------------------------------------------
+    # Read-only state accessors
+    # ------------------------------------------------------------------
+
+    @property
+    def target_pose(self) -> np.ndarray:
+        """Current target pose [x_north, y_east, psi_deg] (read-only copy)."""
+        return self._target_pose.copy()
+
+    @property
+    def thrusters(self) -> np.ndarray:
+        """Current thruster RPM setpoints [n1, n2, n3, n4] (read-only copy)."""
+        return self._thrusters.copy()
+
+    @property
+    def angles(self) -> np.ndarray:
+        """Current thruster angles in degrees [a1, a2, a3, a4] (read-only copy)."""
+        return self._angles.copy()
+
+    @property
+    def epsilon_ned(self) -> np.ndarray:
+        """Position error in NED frame [dx, dy, dpsi_deg] (read-only copy)."""
+        return self._epsilon_ned.copy()
+
+    # ------------------------------------------------------------------
     # Gymnasium API
     # ------------------------------------------------------------------
 
@@ -211,6 +235,12 @@ class MilliAmpereEnv(gym.Env):
 
         # Sleep for control period
         self.transport.sleep(self.config.dt)
+
+        # Legacy render-equivalent sleep (models trained with rendering active
+        # experienced ~250ms per step from clock.tick(4); this preserves that
+        # timing for backward compatibility when evaluating legacy models)
+        if self.config.legacy_step_sleep > 0:
+            self.transport.sleep(self.config.legacy_step_sleep)
 
         # Collect observation
         obs = self._get_obs()

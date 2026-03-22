@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "pip"
+    directory: "/milliampere_dp"
+    schedule:
+      interval: "monthly"
+  - package-ecosystem: "pip"
+    directory: "/drl"
+    schedule:
+      interval: "monthly"
+  - package-ecosystem: "pip"
+    directory: "/xai"
+    schedule:
+      interval: "monthly"

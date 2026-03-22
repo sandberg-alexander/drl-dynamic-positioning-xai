@@ -8,6 +8,7 @@ from enum import IntEnum
 
 import numpy as np
 
+from milliampere_drl.config import DeployConfig
 from milliampere_drl.spline import build_spline, heading_from_derivative
 
 
@@ -29,7 +30,7 @@ class DRLDeployer:
     this module can be imported on host without ROS installed.
     """
 
-    def __init__(self, model_path: str, config_path: str, device: str = "cpu") -> None:
+    def __init__(self, config: DeployConfig, device: str = "cpu") -> None:
         # Lazy-import ROS dependencies
         import gymnasium as gym
         import milliampere_env  # noqa: F401 -- registers MilliAmpere1-v1
@@ -42,13 +43,14 @@ class DRLDeployer:
         self._Mode = Mode
         self._ObservationActuatorRefPair = ObservationActuatorRefPair
         self._NorthEastHeading = NorthEastHeading
+        self._config = config
 
         # State
         self.mode_flag = DeployMode.DP
         self.time_step = 0
         self.data: np.ndarray | None = None
         self.pose_nr = 0
-        self.init_pose: np.ndarray | tuple[float, ...] | None = None
+        self.init_pose: np.ndarray | None = None
         self.sample_nr = 0
 
         # Setup publishers
@@ -69,16 +71,19 @@ class DRLDeployer:
         rospy.Subscriber("/drl/mode", Mode, self._mode_callback)
 
         # Load model & environment
-        self.model = PPO.load(model_path, device=device)
-        self.env = gym.make("MilliAmpere1-v1", config_path=config_path)
+        from milliampere_env.milliampere_env import MilliAmpereEnv
+
+        self.model = PPO.load(config.model_path, device=device)
+        self.env = gym.make("MilliAmpere1-v1", config_path=config.env_config)
         self.model.set_env(self.env)
+        self._dp_env: MilliAmpereEnv = self.env.unwrapped  # type: ignore[assignment]
 
         # Determine data path
         ros_master_uri = os.environ.get("ROS_MASTER_URI")
         if ros_master_uri == "http://simulator_local:11311":
-            self.data_path = "/app/runs/sim/"
+            self.data_path = config.data_path_sim
         else:
-            self.data_path = "/app/runs/real/"
+            self.data_path = config.data_path_real
         self.header = (
             "x,y,psi,u,v,r,"
             "n1x,n1y,n2x,n2y,n3x,n3y,n4x,n4y,"
@@ -86,31 +91,10 @@ class DRLDeployer:
         )
         self.header2 = "x,y,psi,u,v,r,n1x,n1y,n2x,n2y,n3x,n3y,n4x,n4y"
 
-        # Test parameters
+        # Test parameters (from config)
         self.data_points = 22
-
-        self.vep_length_dp = 200
-        self.test_length_dp = 5
-        self.test_pose = [(4, 0, 0), (4, 4, 0), (0, 0, 0), (0, 0, np.pi)]
-
-        self.test_length_north = 200
-        self.ds_north = 0.1
-
-        self.test_length_spline = 200
         self.spline_x, self.spline_y = build_spline()
         self.s = 0.0
-        self.ds_spline = 0.005
-
-        self.vep_length_action = 200
-        self.sample_length_action = 5
-        self.sample_pose = [
-            (4, 3, np.deg2rad(32)),
-            (3.3, -1, np.deg2rad(-149)),
-            (-0.8, -3.4, np.deg2rad(-19)),
-            (0, 0, np.deg2rad(27)),
-        ]
-
-        self.sample_length_vf = 1000
 
         # Initialize env
         self.obs, _ = self.env.reset()
@@ -167,18 +151,19 @@ class DRLDeployer:
         self._set_mode(DeployMode.DP_TEST)
         self._rospy.loginfo("----- Testing mode: DP")
         self.pose_nr = 0
-        self.init_pose = self.env.unwrapped._target_pose.copy()  # type: ignore[attr-defined]
-        self.data = np.zeros(
-            (self.vep_length_dp * self.test_length_dp, self.data_points)
-        )
+        self.init_pose = self._dp_env.target_pose
+        cfg = self._config
+        self.data = np.zeros((cfg.vep_length_dp * cfg.test_length_dp, self.data_points))
 
     def _run_dp_test(self) -> None:
-        if self.time_step >= self.test_length_dp * self.vep_length_dp + 1:
+        cfg = self._config
+        if self.time_step >= cfg.test_length_dp * cfg.vep_length_dp + 1:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"{self.data_path}data_test_dp_{ts}.csv"
+            assert self.data is not None
             np.savetxt(
                 filename,
-                self.data,  # type: ignore[arg-type]
+                self.data,
                 delimiter=",",
                 fmt="%f",
                 header=self.header,
@@ -186,11 +171,12 @@ class DRLDeployer:
             )
             self._set_mode(DeployMode.DP)
             self._rospy.loginfo("----- DP mode")
-        elif self.time_step % self.vep_length_dp == 0:
-            if self.pose_nr < 4:
-                dx, dy, heading = self.test_pose[self.pose_nr]
-                self.target_msg.north = self.init_pose[0] + dx  # type: ignore[index]
-                self.target_msg.east = self.init_pose[1] + dy  # type: ignore[index]
+        elif self.time_step % cfg.vep_length_dp == 0:
+            if self.pose_nr < len(cfg.test_pose):
+                assert self.init_pose is not None
+                dx, dy, heading = cfg.test_pose[self.pose_nr]
+                self.target_msg.north = self.init_pose[0] + dx
+                self.target_msg.east = self.init_pose[1] + dy
                 self.target_msg.heading = heading
                 self.pub_target.publish(self.target_msg)
                 self.pose_nr += 1
@@ -199,15 +185,17 @@ class DRLDeployer:
         self._set_mode(DeployMode.NORTH_TEST)
         self._rospy.loginfo("----- Testing mode: path-following-north")
         self.target_msg.heading = 0
-        self.data = np.zeros((self.test_length_north, self.data_points))
+        self.data = np.zeros((self._config.test_length_north, self.data_points))
 
     def _run_north_test(self) -> None:
-        if self.time_step >= self.test_length_north + 1:
+        cfg = self._config
+        if self.time_step >= cfg.test_length_north + 1:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"{self.data_path}data_test_north_{ts}.csv"
+            assert self.data is not None
             np.savetxt(
                 filename,
-                self.data,  # type: ignore[arg-type]
+                self.data,
                 delimiter=",",
                 fmt="%f",
                 header=self.header,
@@ -216,23 +204,25 @@ class DRLDeployer:
             self._set_mode(DeployMode.DP)
             self._rospy.loginfo("----- DP mode")
         else:
-            self.target_msg.north = self.env.unwrapped._target_pose[0] + self.ds_north  # type: ignore[attr-defined]
+            self.target_msg.north = self._dp_env.target_pose[0] + cfg.ds_north
             self.pub_target.publish(self.target_msg)
 
     def _start_spline_test(self) -> None:
         self._set_mode(DeployMode.SPLINE_TEST)
         self._rospy.loginfo("----- Testing mode: path-following-spline")
-        self.init_pose = self.env.unwrapped._target_pose.copy()  # type: ignore[attr-defined]
-        self.data = np.zeros((self.test_length_spline, self.data_points))
+        self.init_pose = self._dp_env.target_pose
+        self.data = np.zeros((self._config.test_length_spline, self.data_points))
         self.s = 0.0
 
     def _run_spline_test(self) -> None:
-        if self.time_step >= self.test_length_spline + 1:
+        cfg = self._config
+        if self.time_step >= cfg.test_length_spline + 1:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"{self.data_path}data_test_spline_{ts}.csv"
+            assert self.data is not None
             np.savetxt(
                 filename,
-                self.data,  # type: ignore[arg-type]
+                self.data,
                 delimiter=",",
                 fmt="%f",
                 header=self.header,
@@ -241,14 +231,15 @@ class DRLDeployer:
             self._set_mode(DeployMode.DP)
             self._rospy.loginfo("----- DP mode")
         else:
-            self.s += self.ds_spline
+            assert self.init_pose is not None
+            self.s += cfg.ds_spline
             x_t = float(self.spline_x(self.s))
             y_t = float(self.spline_y(self.s))
             dx_dt = float(self.spline_x(self.s, 1))
             dy_dt = float(self.spline_y(self.s, 1))
             psi_t = heading_from_derivative(dx_dt, dy_dt)
-            self.target_msg.north = self.init_pose[0] + x_t  # type: ignore[index]
-            self.target_msg.east = self.init_pose[1] + y_t  # type: ignore[index]
+            self.target_msg.north = self.init_pose[0] + x_t
+            self.target_msg.east = self.init_pose[1] + y_t
             self.target_msg.heading = psi_t
             self.pub_target.publish(self.target_msg)
 
@@ -256,18 +247,21 @@ class DRLDeployer:
         self._set_mode(DeployMode.ACTION_SAMPLE)
         self._rospy.loginfo("----- Sampling mode: action")
         self.pose_nr = 0
-        self.init_pose = self.env.unwrapped._target_pose.copy()  # type: ignore[attr-defined]
+        self.init_pose = self._dp_env.target_pose
+        cfg = self._config
         self.data = np.zeros(
-            (self.sample_length_action * self.vep_length_action // 2, len(self.obs))
+            (cfg.sample_length_action * cfg.vep_length_action // 2, len(self.obs))
         )
 
     def _run_action_sample(self) -> None:
-        if self.time_step >= self.sample_length_action * self.vep_length_dp + 1:
+        cfg = self._config
+        if self.time_step >= cfg.sample_length_action * cfg.vep_length_dp + 1:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"/app/xai_samples/action/sample_{ts}.csv"
+            filename = f"{cfg.xai_action_sample_path}sample_{ts}.csv"
+            assert self.data is not None
             np.savetxt(
                 filename,
-                self.data,  # type: ignore[arg-type]
+                self.data,
                 delimiter=",",
                 fmt="%f",
                 header=self.header2,
@@ -275,11 +269,12 @@ class DRLDeployer:
             )
             self._set_mode(DeployMode.DP)
             self._rospy.loginfo("----- DP mode")
-        elif self.time_step % self.vep_length_action == 0:
-            if self.pose_nr < 4:
-                dx, dy, heading = self.sample_pose[self.pose_nr]
-                self.target_msg.north = self.init_pose[0] + dx  # type: ignore[index]
-                self.target_msg.east = self.init_pose[1] + dy  # type: ignore[index]
+        elif self.time_step % cfg.vep_length_action == 0:
+            if self.pose_nr < len(cfg.sample_pose):
+                assert self.init_pose is not None
+                dx, dy, heading = cfg.sample_pose[self.pose_nr]
+                self.target_msg.north = self.init_pose[0] + dx
+                self.target_msg.east = self.init_pose[1] + dy
                 self.target_msg.heading = heading
                 self.pub_target.publish(self.target_msg)
                 self.pose_nr += 1
@@ -287,15 +282,17 @@ class DRLDeployer:
     def _start_vf_sample(self) -> None:
         self._set_mode(DeployMode.VF_SAMPLE)
         self._rospy.loginfo("----- Sampling mode: value-function")
-        self.data = np.zeros((self.sample_length_vf, len(self.obs)))
+        self.data = np.zeros((self._config.sample_length_vf, len(self.obs)))
 
     def _run_vf_sample(self) -> None:
-        if self.time_step >= self.sample_length_vf + 1:
+        cfg = self._config
+        if self.time_step >= cfg.sample_length_vf + 1:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"/app/xai_samples/value_function/sample_{ts}.csv"
+            filename = f"{cfg.xai_vf_sample_path}sample_{ts}.csv"
+            assert self.data is not None
             np.savetxt(
                 filename,
-                self.data,  # type: ignore[arg-type]
+                self.data,
                 delimiter=",",
                 fmt="%f",
                 header=self.header2,
@@ -313,17 +310,17 @@ class DRLDeployer:
         m.n_x2d_prev, m.n_y2d_prev = obs[8], obs[9]
         m.n_x3d_prev, m.n_y3d_prev = obs[10], obs[11]
         m.n_x4d_prev, m.n_y4d_prev = obs[12], obs[13]
-        thrusters = self.env.unwrapped._thrusters  # type: ignore[attr-defined]
-        angles = self.env.unwrapped._angles  # type: ignore[attr-defined]
+        thrusters = self._dp_env.thrusters
+        angles = self._dp_env.angles
         m.n_d1, m.alpha_d1 = thrusters[0], angles[0]
         m.n_d2, m.alpha_d2 = thrusters[1], angles[1]
         m.n_d3, m.alpha_d3 = thrusters[2], angles[2]
         m.n_d4, m.alpha_d4 = thrusters[3], angles[3]
-        target = self.env.unwrapped._target_pose  # type: ignore[attr-defined]
+        target = self._dp_env.target_pose
         m.target_x = target[0]
         m.target_y = target[1]
         m.target_heading = target[2]
-        epsilon_ned = self.env.unwrapped._epsilon_ned  # type: ignore[attr-defined]
+        epsilon_ned = self._dp_env.epsilon_ned
         m.x_ned_err = epsilon_ned[0]
         m.y_ned_err = epsilon_ned[1]
         m.psi_ned_err = epsilon_ned[2]

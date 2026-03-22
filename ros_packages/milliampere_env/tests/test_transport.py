@@ -73,3 +73,16 @@ class TestMockTransport:
     def test_velocity_default_none(self):
         t = MockTransport()
         assert t.get_velocity() is None
+
+    def test_set_velocity(self):
+        t = MockTransport()
+        t.set_velocity(0.5, -0.1, 0.02)
+        assert t.get_velocity() == (0.5, -0.1, 0.02)
+
+    def test_velocity_used_over_pose_delta(self):
+        """When velocity is set, get_velocity returns it (not None)."""
+        t = MockTransport()
+        t.set_velocity(1.0, 0.0, 0.0)
+        vel = t.get_velocity()
+        assert vel is not None
+        assert vel[0] == 1.0

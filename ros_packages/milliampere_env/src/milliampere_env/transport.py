@@ -81,6 +81,7 @@ class RosTransport(VesselTransport):
 
         # State from callbacks
         self._pose_data = None
+        self._twist_data = None
         self._waypoint_data = None
         self._mode_data = None
 
@@ -95,6 +96,11 @@ class RosTransport(VesselTransport):
 
         # Subscribers
         rospy.Subscriber("/navigation/pose", PoseStamped, self._pose_callback)
+
+        if config.velocity.use_topic:
+            from geometry_msgs.msg import TwistStamped
+
+            rospy.Subscriber(config.velocity.topic, TwistStamped, self._twist_callback)
 
         if config.target.type.value == "waypoint":
             from custom_msgs.msg import NorthEastHeading
@@ -125,6 +131,9 @@ class RosTransport(VesselTransport):
 
     def _pose_callback(self, data) -> None:
         self._pose_data = data
+
+    def _twist_callback(self, data) -> None:
+        self._twist_data = data
 
     def _waypoint_callback(self, data) -> None:
         self._waypoint_data = data
@@ -161,6 +170,12 @@ class RosTransport(VesselTransport):
         if self._pose_data is None:
             raise RuntimeError("No pose data received yet")
         return self._pose_data.header.stamp.to_sec()
+
+    def get_velocity(self) -> tuple[float, float, float] | None:
+        if self._twist_data is None:
+            return None
+        t = self._twist_data.twist
+        return (t.linear.x, t.linear.y, t.angular.z)
 
     def reset_simulation(self, num_calls: int, sleep_between: float) -> None:
         if self._reset_proxy is None:
@@ -240,6 +255,7 @@ class MockTransport(VesselTransport):
         self._last_throttle = np.zeros(4)
         self._last_angles = np.zeros(4)
         self._waypoint: tuple[float, float, float] | None = None
+        self._velocity: tuple[float, float, float] | None = None
         self._mode: str | None = None
         self._reset_count = 0
 
@@ -267,6 +283,9 @@ class MockTransport(VesselTransport):
     def is_shutdown(self) -> bool:
         return self._shutdown
 
+    def get_velocity(self) -> tuple[float, float, float] | None:
+        return self._velocity
+
     def get_waypoint(self) -> tuple[float, float, float] | None:
         return self._waypoint
 
@@ -281,6 +300,10 @@ class MockTransport(VesselTransport):
     def set_pose(self, x: float, y: float, psi_deg: float) -> None:
         """Inject a pose for testing."""
         self._pose[:] = [x, y, psi_deg]
+
+    def set_velocity(self, u: float, v: float, r: float) -> None:
+        """Inject a body-frame velocity for testing."""
+        self._velocity = (u, v, r)
 
     def set_waypoint(self, north: float, east: float, heading_deg: float) -> None:
         """Inject a waypoint for testing."""

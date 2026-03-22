@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, "rework/**"]
+    branches: [main, "rework/**", "polish/**"]
   pull_request:
     branches: [main]
 
@@ -19,6 +19,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           version: "latest"
+          enable-cache: true
 
       - uses: actions/setup-python@v5
         with:
@@ -49,6 +50,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           version: "latest"
+          enable-cache: true
 
       - uses: actions/setup-python@v5
         with:
@@ -62,16 +64,16 @@ jobs:
           uv pip install --system -e "xai/[dev]"
 
       - name: Test milliampere_dp
-        run: cd milliampere_dp && python -m pytest --tb=short -q
+        run: cd milliampere_dp && python -m pytest --cov=milliampere_dp --cov-report=term-missing --tb=short -q
 
       - name: Test milliampere_env
-        run: python -m pytest ros_packages/milliampere_env/tests/ --tb=short -q
+        run: python -m pytest ros_packages/milliampere_env/tests/ --cov=milliampere_env --cov-report=term-missing --tb=short -q
 
       - name: Test milliampere_drl
-        run: cd drl && python -m pytest --tb=short -q
+        run: cd drl && python -m pytest --cov=milliampere_drl --cov-report=term-missing --tb=short -q
 
       - name: Test milliampere_xai
-        run: cd xai && python -m pytest --tb=short -q
+        run: cd xai && python -m pytest --cov=milliampere_xai --cov-report=term-missing --tb=short -q
 
       - name: Integration tests
         run: python -m pytest tests/integration/ --tb=short -q
