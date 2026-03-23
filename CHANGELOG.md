@@ -1,3 +1,13 @@
+## v0.8.0 (2026-03-23)
+
+### Feat
+
+- Phase 2 — decompose dashboard.py into milliampere_xai.rendering
+
+### Fix
+
+- pyright errors in PygameRenderer — use Any for surface type
+
 ## v0.7.0 (2026-03-23)
 
 ### Feat
