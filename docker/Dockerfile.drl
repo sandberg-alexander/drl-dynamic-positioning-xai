@@ -15,6 +15,6 @@ RUN /bin/bash -c "source /opt/ros/noetic/setup.bash && catkin_make"
 # Install milliampere_drl package (milliampere_dp already at /app/milliampere_dp/ from base)
 WORKDIR /app
 COPY drl/ /app/drl/
-RUN uv pip install --system --no-cache /app/milliampere_dp/ /app/drl/ pygame
+RUN uv pip install --system --no-cache --no-sources /app/milliampere_dp/ /app/drl/ pygame
 
 CMD ["tail", "-f", "/dev/null"]
