@@ -11,7 +11,6 @@
     "**/.venv",
     "data/",
     "external/",
-    "xai/src/milliampere_xai/dashboard.py",
     "milliampere_dp/src/milliampere_dp/plotting/"
   ],
   "reportMissingImports": "warning",

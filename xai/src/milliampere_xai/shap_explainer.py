@@ -24,12 +24,12 @@ from milliampere_dp.vessel import (
     THRUSTER_ARM_Y,
 )
 
-from milliampere_xai.dashboard import RenderExplanation
 from milliampere_xai.model_wrappers import (
     Obs2ActionWrapper,
     Obs2ValueWrapper,
     combine_actuator_ref,
 )
+from milliampere_xai.rendering import RenderExplanation
 
 
 class Agent:

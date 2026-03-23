@@ -34,10 +34,10 @@ jobs:
           uv pip install --system -e "xai/[dev]"
 
       - name: Ruff check
-        run: ruff check --no-fix --exclude "data/" --exclude "xai/src/milliampere_xai/dashboard.py" .
+        run: ruff check --no-fix --exclude "data/" .
 
       - name: Ruff format check
-        run: ruff format --check --exclude "data/" --exclude "xai/src/milliampere_xai/dashboard.py" .
+        run: ruff format --check --exclude "data/" .
 
       - name: Pyright
         run: pyright

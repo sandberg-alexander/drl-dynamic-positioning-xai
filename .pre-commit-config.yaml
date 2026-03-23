@@ -4,9 +4,9 @@ repos:
     hooks:
       - id: ruff-check
         args: [--fix]
-        exclude: "^(data/|xai/src/milliampere_xai/dashboard\\.py)"
+        exclude: "^data/"
       - id: ruff-format
-        exclude: "^(data/|xai/src/milliampere_xai/dashboard\\.py)"
+        exclude: "^data/"
 
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v4.13.9
