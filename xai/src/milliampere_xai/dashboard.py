@@ -1,8 +1,22 @@
 import math
-from enum import Enum
 
 import numpy as np
 import pygame
+from milliampere_dp.rendering import Color
+from milliampere_dp.rendering.geometry import (
+    vessel_hull_polygon,
+    vessel_moment_marker_line,
+    vessel_triangle_polygon,
+)
+from milliampere_dp.rendering.transforms import (
+    R2,
+    T2,
+    Viewport,
+    degrees_to_pygame,
+    meters_to_pixels,
+    transform_body_to_ned,
+    transform_shape,
+)
 from milliampere_dp.vessel import (
     MAX_THRUSTER_RPM,
     THRUSTER_ARM_X,
@@ -10,39 +24,6 @@ from milliampere_dp.vessel import (
     VESSEL_BEAM,
     VESSEL_LENGTH,
 )
-
-###########################################################################################################
-
-
-class Color(Enum):
-    """Color constants for the XAI dashboard rendering."""
-
-    WHITE = (255, 255, 255)
-    GRAY = (150, 150, 150)
-    BLACK = (0, 0, 0)
-    GREEN = (0, 255, 0)
-    PURPLE = (255, 0, 255)
-    RED = (255, 0, 0)
-    ORANGE = (255, 128, 0)
-
-    SCREEN_COLOR = (240, 240, 240)
-
-    TABLEAU_BLUE = (87, 120, 164)
-    TABLEAU_ORANGE = (228, 148, 68)
-    TABLEAU_GREEN = (106, 159, 88)
-    TABLEAU_RED = (209, 97, 93)
-
-    LEGEND_BOX = (200, 200, 200, 180)
-
-    AGENT_BLACK = (0, 0, 0, 0)
-    AGENT_BLUE = (0, 122, 255, 220)
-    DESIRED_YELLOW = (255, 102, 0)
-    DESIRED_LIGHT_YELLOW = (255, 205, 128)
-    OCEAN_BLUE = (209, 237, 255)
-    OCEAN_GRID = (182, 206, 222)
-    VELOCITY_GREEN = (0, 255, 123)
-
-    LIGHT_RED = (255, 171, 171)
 
 
 ###########################################################################################################
@@ -537,47 +518,19 @@ class VesselRender(Window):
     def __init__(self, screen, window_pos, scale, title, window_width, window_height):
         super().__init__(screen, window_pos, title, window_width, window_height)
 
-        self.scale = scale
-        self.R = np.array([[0, self.scale], [-self.scale, 0]])
-        self.center = (window_width / 2, window_height / 2)
-        self.T = np.array([[self.center[1]], [self.center[0]]])
+        self._viewport = Viewport.from_window(scale, window_width, window_height)
+        self.scale = self._viewport.scale
+        self.center = self._viewport.center
+        self.R = self._viewport.R
+        self.T = self._viewport.T
 
         self.vessel_surface = pygame.Surface(
             (window_width, window_height), pygame.SRCALPHA
         )
-        self.shape = np.array(
-            [
-                [self.VESSEL_LENGTH / 2, -(self.VESSEL_WIDTH / 2 - self.VESSEL_CORNER)],
-                [self.VESSEL_LENGTH / 2, self.VESSEL_WIDTH / 2 - self.VESSEL_CORNER],
-                [self.VESSEL_LENGTH / 2 - self.VESSEL_CORNER, self.VESSEL_WIDTH / 2],
-                [-(self.VESSEL_LENGTH / 2 - self.VESSEL_CORNER), self.VESSEL_WIDTH / 2],
-                [-self.VESSEL_LENGTH / 2, self.VESSEL_WIDTH / 2 - self.VESSEL_CORNER],
-                [
-                    -self.VESSEL_LENGTH / 2,
-                    -(self.VESSEL_WIDTH / 2 - self.VESSEL_CORNER),
-                ],
-                [
-                    -(self.VESSEL_LENGTH / 2 - self.VESSEL_CORNER),
-                    -self.VESSEL_WIDTH / 2,
-                ],
-                [self.VESSEL_LENGTH / 2 - self.VESSEL_CORNER, -self.VESSEL_WIDTH / 2],
-            ]
-        )
+        self.shape = vessel_hull_polygon()
         self.circle_point = np.zeros((1, 2))
-        self.triangle_shape = np.array(
-            [
-                [self.VESSEL_LENGTH / 2, 0],
-                [
-                    self.VESSEL_LENGTH / 2 - self.VESSEL_TRIANGLE,
-                    self.VESSEL_TRIANGLE / 2,
-                ],
-                [
-                    self.VESSEL_LENGTH / 2 - self.VESSEL_TRIANGLE,
-                    -self.VESSEL_TRIANGLE / 2,
-                ],
-            ]
-        )
-        self.moment_marker_line = np.array([[0, 0], [self.VESSEL_MOMENT_MARKER, 0]])
+        self.triangle_shape = vessel_triangle_polygon()
+        self.moment_marker_line = vessel_moment_marker_line()
 
     def _draw_body_grid(
         self,
@@ -748,30 +701,28 @@ class VesselRender(Window):
             segment_end = (px1 + (px2 - px1) * t2, py1 + (py2 - py1) * t2)
             pygame.draw.line(self.surface, color, segment_start, segment_end, 2)
 
-    # Transformations #############
+    # Transformations — thin wrappers delegating to milliampere_dp.rendering
 
     def _transform_vessel(self, x, y, psi, shape):
-        angle = np.deg2rad(psi)
-        return (self._R2(angle).T @ shape.T + self._T2(x, y)).T
+        return transform_shape(x, y, psi, shape)
 
     def _transform_body2ned(self, x, y, psi, shape):
-        angle = np.deg2rad(psi)
-        return (self._R2(angle) @ (shape.T + self._T2(-x, -y))).T
+        return transform_body_to_ned(x, y, psi, shape)
 
     def _R2(self, psi):
-        return np.array([[np.cos(psi), np.sin(psi)], [-np.sin(psi), np.cos(psi)]])
+        return R2(psi)
 
     def _T2(self, x, y):
-        return np.array([[x, y]]).T
+        return T2(x, y)
 
     def _world_2_pixels(self, cord):
-        return (self.R @ cord.T + self.T).T
+        return self._viewport.world_to_pixels(cord)
 
     def _degrees2pygame(self, angle):
-        return np.pi * angle / 180 - np.pi / 2
+        return degrees_to_pygame(angle)
 
     def _scalar2pygame(self, scalar):
-        return self.scale * scalar
+        return meters_to_pixels(self.scale, scalar)
 
 
 ###########################################################################################################

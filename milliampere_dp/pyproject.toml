@@ -33,6 +33,7 @@ Issues = "https://github.com/sandberg-alexander/drl-dynamic-positioning-xai/issu
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "pytest-cov>=4.0"]
+rendering = ["pydantic>=2.0,<3"]
 
 [project.scripts]
 plot-eval = "milliampere_dp.plotting.plot_eval:main"

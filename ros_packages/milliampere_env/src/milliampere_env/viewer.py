@@ -83,8 +83,10 @@ def main() -> None:
     min_reward = -0.1 - 0.1 - 0.1 - 1.0  # -1.3
 
     # Vessel dimensions in pixels
-    rect_width = 2.86 * resolution
-    rect_height = 5.06 * resolution
+    from milliampere_dp.vessel import VESSEL_BEAM, VESSEL_LENGTH
+
+    rect_width = VESSEL_BEAM * resolution
+    rect_height = VESSEL_LENGTH * resolution
 
     # --- Precompute Gaussian heatmap grids (match legacy __init__) ---
     sigma_d = 1.0
