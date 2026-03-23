@@ -14,7 +14,7 @@ try:
 except ImportError:
     setup(
         name="milliampere_env",
-        version="0.6.0",
+        version="0.7.0",
         packages=find_packages("src"),
         package_dir={"": "src"},
         install_requires=[

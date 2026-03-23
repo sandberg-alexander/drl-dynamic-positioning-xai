@@ -1,3 +1,9 @@
+## v0.7.0 (2026-03-23)
+
+### Feat
+
+- Phase 1 — extract shared rendering into milliampere_dp.rendering
+
 ## v0.6.0 (2026-03-22)
 
 ### Feat
