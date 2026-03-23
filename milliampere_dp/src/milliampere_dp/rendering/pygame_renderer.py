@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 
@@ -18,6 +19,8 @@ class PygameRenderer:
     """Pygame implementation of the Renderer protocol.
 
     Does NOT inherit from Renderer — structural subtyping via Protocol.
+    Surface parameters are typed as ``Any`` to avoid importing pygame
+    at module level (lazy import pattern).
     """
 
     def __init__(self) -> None:
@@ -27,15 +30,15 @@ class PygameRenderer:
 
     def draw_polygon(
         self,
-        surface: object,
+        surface: Any,
         color: ColorType,
         points: np.ndarray | Sequence[Sequence[float]],
     ) -> None:
-        self._pygame.draw.polygon(surface, color, points)
+        self._pygame.draw.polygon(surface, color, points)  # type: ignore[arg-type]
 
     def draw_circle(
         self,
-        surface: object,
+        surface: Any,
         color: ColorType,
         center: Sequence[float],
         radius: float,
@@ -44,7 +47,7 @@ class PygameRenderer:
 
     def draw_line(
         self,
-        surface: object,
+        surface: Any,
         color: ColorType,
         start: Sequence[float],
         end: Sequence[float],
@@ -54,7 +57,7 @@ class PygameRenderer:
 
     def draw_lines(
         self,
-        surface: object,
+        surface: Any,
         color: ColorType,
         closed: bool,
         points: Sequence[Sequence[float]],
@@ -64,7 +67,7 @@ class PygameRenderer:
 
     def draw_dashed_line(
         self,
-        surface: object,
+        surface: Any,
         color: ColorType,
         start: Sequence[float],
         end: Sequence[float],

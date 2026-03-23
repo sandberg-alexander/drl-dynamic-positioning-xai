@@ -7,7 +7,7 @@ do not need to inherit.  pyright validates conformance at type-check time.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Tuple, Union, runtime_checkable  # noqa: UP035
+from typing import Any, Tuple, Union, runtime_checkable  # noqa: UP035
 
 import numpy as np
 
@@ -32,7 +32,7 @@ class Renderer(Protocol):
 
     def draw_polygon(
         self,
-        surface: object,
+        surface: Any,
         color: ColorType,
         points: np.ndarray | Sequence[Sequence[float]],
     ) -> None:
@@ -41,7 +41,7 @@ class Renderer(Protocol):
 
     def draw_circle(
         self,
-        surface: object,
+        surface: Any,
         color: ColorType,
         center: Sequence[float],
         radius: float,
@@ -51,7 +51,7 @@ class Renderer(Protocol):
 
     def draw_line(
         self,
-        surface: object,
+        surface: Any,
         color: ColorType,
         start: Sequence[float],
         end: Sequence[float],
@@ -62,7 +62,7 @@ class Renderer(Protocol):
 
     def draw_lines(
         self,
-        surface: object,
+        surface: Any,
         color: ColorType,
         closed: bool,
         points: Sequence[Sequence[float]],
@@ -73,7 +73,7 @@ class Renderer(Protocol):
 
     def draw_dashed_line(
         self,
-        surface: object,
+        surface: Any,
         color: ColorType,
         start: Sequence[float],
         end: Sequence[float],
