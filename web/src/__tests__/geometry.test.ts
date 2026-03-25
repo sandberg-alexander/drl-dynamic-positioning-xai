@@ -61,8 +61,11 @@ describe("vesselMomentMarkerLine", () => {
     expect(line).toHaveLength(2);
   });
 
-  it("is centered at origin", () => {
+  it("starts at origin", () => {
     const line = vesselMomentMarkerLine();
-    expect(line[0][0] + line[1][0]).toBeCloseTo(0);
+    // Python: [[0, 0], [marker, 0]] — starts at CoG
+    expect(line[0][0]).toBeCloseTo(0);
+    expect(line[0][1]).toBeCloseTo(0);
+    expect(line[1][0]).toBeGreaterThan(0);
   });
 });

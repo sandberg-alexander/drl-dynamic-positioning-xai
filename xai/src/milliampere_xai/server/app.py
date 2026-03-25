@@ -217,7 +217,7 @@ async def _demo_loop(manager: ConnectionManager, fps: float = 5.0) -> None:
             time_step=step,
             time_seconds=t,
         )
-        data = msgpack.packb(frame.model_dump())
+        data: bytes = msgpack.packb(frame.model_dump())  # type: ignore[assignment]
         await manager.broadcast_bytes(data)
         step += 1
         await asyncio.sleep(1.0 / fps)
