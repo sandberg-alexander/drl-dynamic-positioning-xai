@@ -56,9 +56,9 @@ def plot_spline(csv_path, output_dir, kind, run_number):
     df = pd.read_csv(csv_path)
 
     # log → body-frame errors
-    x_b = df["x"].values * 10  # m
-    y_b = df["y"].values * 10
-    psi_err = df["psi"].values * np.pi  # rad
+    x_b = np.asarray(df["x"].values) * 10  # m
+    y_b = np.asarray(df["y"].values) * 10
+    psi_err = np.asarray(df["psi"].values) * np.pi  # rad
 
     N = len(df)
     x_d, y_d, psi_d, ctrl_pts = build_reference(N, kind=kind)

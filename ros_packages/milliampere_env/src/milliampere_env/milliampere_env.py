@@ -12,7 +12,7 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-from milliampere_dp import vessel
+from milliampere_dp import vessel  # type: ignore[attr-defined]
 from milliampere_dp.log import get_logger
 from milliampere_dp.rewards import (
     angle_rate_penalty,

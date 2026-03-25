@@ -7,7 +7,7 @@ try:
 except PackageNotFoundError:
     __version__ = "0.0.0-dev"
 
-from milliampere_dp import vessel
+from milliampere_dp import vessel as vessel  # type: ignore[attr-defined]
 from milliampere_dp.log import get_logger
 from milliampere_dp.rewards import (
     angle_rate_penalty,

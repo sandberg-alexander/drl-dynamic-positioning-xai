@@ -24,6 +24,7 @@ def build_spline(
     """Return open cubic splines (x(s), y(s)) parameterised on s in [0, 1]."""
     if control_pts is None:
         control_pts = _DEFAULT_CONTROL_PTS
+    assert control_pts is not None
     t = np.linspace(0.0, 1.0, len(control_pts))
     spline_x = CubicSpline(t, control_pts[:, 0], bc_type="natural")
     spline_y = CubicSpline(t, control_pts[:, 1], bc_type="natural")

@@ -729,10 +729,10 @@ def plot_xy_trajectory(data, render_start, render_end, run_number, output_dir):
 
         # Add rectangles at start and end
         for t in my_range:
-            rect_x = y_rot[t]
-            rect_y = x_rot[t]
+            rect_x = float(y_rot[t])
+            rect_y = float(x_rot[t])
             width, height = 5.06, 2.86
-            angle = 90 - psi[t]
+            angle = float(90 - psi[t])
 
             rect = Rectangle(
                 (rect_x - width / 2, rect_y - height / 2),

@@ -116,7 +116,7 @@ class RosTransport(VesselTransport):
 
         # State publisher for viewer
         try:
-            from custom_ros_msgs.msg import EnvState
+            from custom_ros_msgs.msg import EnvState  # type: ignore[attr-defined]
 
             self._EnvState = EnvState
             self._state_pub = rospy.Publisher(

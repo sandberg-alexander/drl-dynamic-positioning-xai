@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pygame
 from milliampere_dp.rendering import Color
@@ -21,8 +23,11 @@ class ShapRender(Window):
         title="SHAP-value",
         window_width=450,
         window_height=450,
+        renderer=None,
     ):
-        super().__init__(screen, window_pos, title, window_width, window_height)
+        super().__init__(
+            screen, window_pos, title, window_width, window_height, renderer=renderer
+        )
 
         # fonts
         self.axis_font = pygame.font.SysFont("DejaVu Sans", 13)
@@ -36,9 +41,9 @@ class ShapRender(Window):
 
         self.bar_gap = 25  # pixels
         self.label_offset = 10  # pixels
-        self.label_surface = [None] * 14
-        self.label_rect = [None] * 14
-        self.bars_py = [None] * self.num_bars
+        self.label_surface: list[Any] = [None] * 14
+        self.label_rect: list[Any] = [None] * 14
+        self.bars_py: list[Any] = [None] * self.num_bars
 
         self.explain_mode = -1
         self.RPM_true = True
@@ -86,8 +91,8 @@ class ShapRender(Window):
             self.window_width - self.window_padding - self.axis_padding_width
         )
 
-        self.label_surface = [None] * self.num_bars
-        self.label_rect = [None] * self.num_bars
+        self.label_surface: list[Any] = [None] * self.num_bars
+        self.label_rect: list[Any] = [None] * self.num_bars
 
         # making labels
         for i in range(self.num_bars):
@@ -109,9 +114,9 @@ class ShapRender(Window):
 
         # making ticks
         self.num_ticks = int(self.max_shap_value / self.increment) + 1
-        self.ticks_px = [None] * self.num_ticks
-        self.tick_label = [None] * self.num_ticks
-        self.tick_rect = [None] * self.num_ticks
+        self.ticks_px: list[Any] = [None] * self.num_ticks
+        self.tick_label: list[Any] = [None] * self.num_ticks
+        self.tick_rect: list[Any] = [None] * self.num_ticks
         for tick in range(self.num_ticks):
             tick_value = tick * self.increment
             self.ticks_px[tick] = (
@@ -282,7 +287,7 @@ class ShapRender(Window):
             x0 = self.window_padding / 2 + self.axis_padding_width
             y0 = self.bars_py[bar_no]
             for seg, w in enumerate(seg_width_px):
-                pygame.draw.rect(
+                self._renderer.draw_rect(
                     self.surface, self.colors[seg], (x0, y0, w, self.bar_height)
                 )
                 x0 += w  # next segment starts where the last finished
@@ -300,15 +305,15 @@ class ShapRender(Window):
             self.surface.blit(self.label_surface[bar_no], self.label_rect[bar_no])
 
     def _draw_axis(self):
-        pygame.draw.line(
+        self._renderer.draw_line(
             self.surface, Color.BLACK.value, self.origo, self.x_axis_end, width=2
         )  # x-axis
-        pygame.draw.line(
+        self._renderer.draw_line(
             self.surface, Color.BLACK.value, self.origo, self.y_axis_end, width=2
         )  # y-axis
 
         for tick in range(self.num_ticks):
-            pygame.draw.line(
+            self._renderer.draw_line(
                 self.surface,
                 Color.BLACK.value,
                 (self.ticks_px[tick], self.origo[1] - 5),

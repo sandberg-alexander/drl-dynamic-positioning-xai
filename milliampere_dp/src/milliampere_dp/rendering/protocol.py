@@ -27,7 +27,8 @@ class Renderer(Protocol):
 
     Concrete implementations (PygameRenderer, future WebSocketRenderer)
     satisfy this protocol by implementing all methods — no inheritance
-    required.
+    required.  All coordinate parameters accept np.ndarray or plain
+    sequences; implementations handle conversion internally.
     """
 
     def draw_polygon(
@@ -43,18 +44,19 @@ class Renderer(Protocol):
         self,
         surface: Any,
         color: ColorType,
-        center: Sequence[float],
+        center: np.ndarray | Sequence[float],
         radius: float,
+        width: int = 0,
     ) -> None:
-        """Draw a filled circle."""
+        """Draw a circle. width=0 means filled, >0 means outline thickness."""
         ...
 
     def draw_line(
         self,
         surface: Any,
         color: ColorType,
-        start: Sequence[float],
-        end: Sequence[float],
+        start: np.ndarray | Sequence[float],
+        end: np.ndarray | Sequence[float],
         width: int = 1,
     ) -> None:
         """Draw a line segment."""
@@ -65,18 +67,27 @@ class Renderer(Protocol):
         surface: Any,
         color: ColorType,
         closed: bool,
-        points: Sequence[Sequence[float]],
+        points: Sequence[np.ndarray | Sequence[float]],
         width: int = 1,
     ) -> None:
         """Draw connected line segments."""
+        ...
+
+    def draw_rect(
+        self,
+        surface: Any,
+        color: ColorType,
+        rect: Any,
+    ) -> None:
+        """Draw a filled rectangle."""
         ...
 
     def draw_dashed_line(
         self,
         surface: Any,
         color: ColorType,
-        start: Sequence[float],
-        end: Sequence[float],
+        start: np.ndarray | Sequence[float],
+        end: np.ndarray | Sequence[float],
         dash_length: float = 10.0,
         gap_length: float = 5.0,
         width: int = 2,

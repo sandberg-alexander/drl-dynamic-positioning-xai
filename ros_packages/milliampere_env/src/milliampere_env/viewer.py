@@ -56,7 +56,7 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        from custom_ros_msgs.msg import EnvState
+        from custom_ros_msgs.msg import EnvState  # type: ignore[attr-defined]
     except ImportError:
         print("custom_ros_msgs not found. Build the catkin workspace first.")
         sys.exit(1)

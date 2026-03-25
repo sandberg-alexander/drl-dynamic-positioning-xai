@@ -10,9 +10,7 @@
   "exclude": [
     "**/.venv",
     "data/",
-    "external/",
-    "milliampere_dp/src/milliampere_dp/plotting/",
-    "xai/src/milliampere_xai/rendering/"
+    "external/"
   ],
   "reportMissingImports": "warning",
   "reportMissingTypeStubs": false,

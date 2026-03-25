@@ -35,8 +35,19 @@ class VesselRender(Window):
     VESSEL_TRIANGLE = 0.4  # meters
     VESSEL_MOMENT_MARKER = 0.6  # meters
 
-    def __init__(self, screen, window_pos, scale, title, window_width, window_height):
-        super().__init__(screen, window_pos, title, window_width, window_height)
+    def __init__(
+        self,
+        screen,
+        window_pos,
+        scale,
+        title,
+        window_width,
+        window_height,
+        renderer=None,
+    ):
+        super().__init__(
+            screen, window_pos, title, window_width, window_height, renderer=renderer
+        )
 
         self._viewport = Viewport.from_window(scale, window_width, window_height)
         self.scale = self._viewport.scale
@@ -134,13 +145,13 @@ class VesselRender(Window):
         for y in horiz:
             p1 = _rot((-diag, y))  # far left
             p2 = _rot((diag, y))  # far right
-            pygame.draw.line(self.surface, color, p1, p2, width)
+            self._renderer.draw_line(self.surface, color, p1, p2, width)
 
         # draw vertical (world-X) lines  ------------------------------------
         for x in vert:
             p1 = _rot((x, -diag))  # far up
             p2 = _rot((x, diag))  # far down
-            pygame.draw.line(self.surface, color, p1, p2, width)
+            self._renderer.draw_line(self.surface, color, p1, p2, width)
 
     def draw_vessel(self, x_err=None, y_err=None, psi_err=None, ned=False):
         if ned:
@@ -155,13 +166,13 @@ class VesselRender(Window):
             triangle = self.triangle_shape
 
         self.vessel_surface.fill(Color.AGENT_BLACK.value)
-        pygame.draw.polygon(
+        self._renderer.draw_polygon(
             self.vessel_surface, Color.AGENT_BLUE.value, self._world_2_pixels(shape)
         )
-        pygame.draw.polygon(
+        self._renderer.draw_polygon(
             self.vessel_surface, Color.BLACK.value, self._world_2_pixels(triangle)
         )
-        pygame.draw.circle(
+        self._renderer.draw_circle(
             self.vessel_surface,
             Color.BLACK.value,
             self._world_2_pixels(circle).ravel(),
@@ -169,7 +180,9 @@ class VesselRender(Window):
         )
         if not ned:
             line = self._world_2_pixels(self.moment_marker_line)
-            pygame.draw.line(self.vessel_surface, Color.BLACK.value, line[0], line[1])
+            self._renderer.draw_line(
+                self.vessel_surface, Color.BLACK.value, line[0], line[1]
+            )
         self.surface.blit(self.vessel_surface, (0, 0))
 
     def draw_target(
@@ -203,25 +216,24 @@ class VesselRender(Window):
                 )
 
         # Polygon outline removed — using dashed lines instead
-        pygame.draw.circle(
+        self._renderer.draw_circle(
             self.surface, color, self._world_2_pixels(circle).ravel(), radius=3
         )
 
     def _draw_dashed_line(
         self, start_pos, end_pos, color, dash_lenght=10, gap_length=5
     ):
-        px1, py1 = start_pos
-        px2, py2 = end_pos
-        length = ((px2 - px1) ** 2 + (py2 - py1) ** 2) ** 0.5
-        dashes = int(length / (dash_lenght + gap_length))
-        for i in range(dashes):
-            t1 = i / dashes
-            t2 = (i + 0.5) / dashes
-            segment_start = (px1 + (px2 - px1) * t1, py1 + (py2 - py1) * t1)
-            segment_end = (px1 + (px2 - px1) * t2, py1 + (py2 - py1) * t2)
-            pygame.draw.line(self.surface, color, segment_start, segment_end, 2)
+        self._renderer.draw_dashed_line(
+            self.surface,
+            color,
+            start_pos,
+            end_pos,
+            dash_length=dash_lenght,
+            gap_length=gap_length,
+            width=2,
+        )
 
-    # Transformations \u2014 thin wrappers delegating to milliampere_dp.rendering
+    # Transformations — thin wrappers delegating to milliampere_dp.rendering
 
     def _transform_vessel(self, x, y, psi, shape):
         return transform_shape(x, y, psi, shape)

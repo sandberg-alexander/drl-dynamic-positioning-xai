@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pygame
 from milliampere_dp.rendering import Color
+from milliampere_dp.rendering.pygame_renderer import PygameRenderer
 
 from milliampere_xai.rendering._body import BodyRender
 from milliampere_xai.rendering._ned import NedRender
@@ -23,6 +24,7 @@ class RenderExplanation:
     TITLE = "Explanations"
 
     def __init__(self):
+        self._renderer = PygameRenderer()
         self._screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
         pygame.display.set_caption(self.TITLE)
 
@@ -40,13 +42,18 @@ class RenderExplanation:
             "\u03b1_{d\u2084,\u209c} [\u00b0]",
         )
 
-        self._ned_window = NedRender(self._screen, window_pos=(25, 25))
-        self._body_window = BodyRender(self._screen, window_pos=(25, 500))
+        self._ned_window = NedRender(
+            self._screen, window_pos=(25, 25), renderer=self._renderer
+        )
+        self._body_window = BodyRender(
+            self._screen, window_pos=(25, 500), renderer=self._renderer
+        )
         self._shap_window_top = ShapRender(
             self._screen,
             window_pos=(500, 25),
             legend_items=self.shap_legend_items1,
             title="Feature importance using thrust SHAP-values",
+            renderer=self._renderer,
         )
         self._shap_window_bottom = ShapRender(
             self._screen,
@@ -54,10 +61,11 @@ class RenderExplanation:
             legend_items=self.shap_legend_items2,
             title="SHAP-values azimuth angles",
             window_width=475,
+            renderer=self._renderer,
         )
 
         self._shap_explain_window = ShapExplainRender(
-            self._screen, window_pos=(500, 500)
+            self._screen, window_pos=(500, 500), renderer=self._renderer
         )
 
         self.window_font = pygame.font.SysFont("DejaVu Sans", 11)
@@ -94,7 +102,7 @@ class RenderExplanation:
             f"time step: {int(time_step)}, time: {time} s", True, Color.BLACK.value
         )
         text_rect = text_surface.get_rect()
-        text_rect.center = (self.SCREEN_WIDTH / 2, self.SCREEN_HEIGHT - 15)
+        text_rect.center = (int(self.SCREEN_WIDTH / 2), self.SCREEN_HEIGHT - 15)
         self._screen.blit(text_surface, text_rect)
 
         self._body_window.render(

@@ -5,17 +5,21 @@ from __future__ import annotations
 import numpy as np
 import pygame
 from milliampere_dp.rendering import Color
+from milliampere_dp.rendering.pygame_renderer import PygameRenderer
 
 
 class Window:
     """Base class for pygame surface windows in the XAI dashboard."""
 
-    def __init__(self, screen, window_pos, title, window_width, window_height):
+    def __init__(
+        self, screen, window_pos, title, window_width, window_height, renderer=None
+    ):
         # private attributes
         self._screen = screen
         self._window_pos = window_pos
         self._title = title
         self._title_offset = 5  # pixels
+        self._renderer = renderer or PygameRenderer()
 
         # public attributes
         self.window_width = window_width
@@ -72,8 +76,12 @@ class Window:
         right_base = line_end - arrowhead_width / 2 * np.array([-rotate[1], rotate[0]])
 
         if line_length > 0:
-            pygame.draw.line(self.surface, color, start_pos, line_end, line_width)
-        pygame.draw.polygon(self.surface, color, [arrow_tip, left_base, right_base])
+            self._renderer.draw_line(
+                self.surface, color, start_pos, line_end, line_width
+            )
+        self._renderer.draw_polygon(
+            self.surface, color, np.array([arrow_tip, left_base, right_base])
+        )
 
     def create_legend(
         self,
@@ -84,7 +92,7 @@ class Window:
         marker_size=12,
         spacing=5,
         padding=10,
-        margin=10,
+        margin: float = 10,
         padding_bottom=60,
     ):
         rendered_items = []
@@ -104,8 +112,8 @@ class Window:
         surface_rect = self.surface.get_rect()
         box_rect = pygame.Rect(0, 0, box_width, box_height)
         box_rect.bottomright = (
-            surface_rect.width - margin,
-            surface_rect.height - margin - padding_bottom,
+            int(surface_rect.width - margin),
+            int(surface_rect.height - margin - padding_bottom),
         )
 
         legend_surface = pygame.Surface((box_width, box_height), pygame.SRCALPHA)
@@ -122,7 +130,7 @@ class Window:
                 marker_size,
                 marker_size,
             )
-            pygame.draw.rect(legend_surface, marker_color, marker_rect)
+            self._renderer.draw_rect(legend_surface, marker_color, marker_rect)
 
             text_pos = (padding + marker_size + spacing, y_offset)
             legend_surface.blit(text_surface, text_pos)

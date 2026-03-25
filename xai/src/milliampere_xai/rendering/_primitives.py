@@ -3,13 +3,25 @@
 from __future__ import annotations
 
 import math
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pygame
 
+if TYPE_CHECKING:
+    from milliampere_dp.rendering.protocol import Renderer
+
 
 class Utilities:
-    """Shared drawing primitives: arrows, arcs, distance/angle markers."""
+    """Shared drawing primitives: arrows, arcs, distance/angle markers.
+
+    This is a mixin class — expects ``self.surface`` and ``self._renderer``
+    to be provided by the concrete class (via Window through MRO).
+    """
+
+    # Declare attributes provided by Window via MRO so pyright knows about them
+    surface: Any
+    _renderer: Renderer
 
     def __init__(self):
         pass
@@ -19,7 +31,7 @@ class Utilities:
         angle,
         arrow_length,
         color,
-        start_pos=np.zeros(2),
+        start_pos: Any = np.zeros(2),
         arrowhead_length=10,
         arrowhead_width=10,
         line_width=2,
@@ -48,8 +60,12 @@ class Utilities:
         right_base = line_end - arrowhead_width / 2 * np.array([-rotate[1], rotate[0]])
 
         if line_length > 0:
-            pygame.draw.line(self.surface, color, start_pos, line_end, line_width)
-        pygame.draw.polygon(self.surface, color, [arrow_tip, left_base, right_base])
+            self._renderer.draw_line(
+                self.surface, color, start_pos, line_end, line_width
+            )
+        self._renderer.draw_polygon(
+            self.surface, color, [arrow_tip, left_base, right_base]
+        )
 
         # Display measurement text
         if show_measurement:
@@ -81,7 +97,7 @@ class Utilities:
         angle,
         center,
         color,
-        radius=10,
+        radius: float = 10,
         line_width=2,
         arrowhead_length=10,
         arrowhead_width=10,
@@ -112,13 +128,15 @@ class Utilities:
         tip_angle = start_angle + sign * (line_arc_angle + arrowhead_arc_angle)
 
         if line_arc_length > 0:
-            arc_points = [None] * num_points
+            arc_points: list[tuple[float, float]] = []
             for i in range(num_points):
                 t = i / (num_points - 1)
                 theta = start_angle + sign * (line_arc_angle * t)
                 pos = center + radius * np.array([np.cos(theta), np.sin(theta)])
-                arc_points[i] = pos
-            pygame.draw.lines(self.surface, color, False, arc_points, line_width)
+                arc_points.append(tuple(pos))
+            self._renderer.draw_lines(
+                self.surface, color, False, arc_points, line_width
+            )
 
         rotate = np.array([np.cos(tip_angle), np.sin(tip_angle)])
         tip = center + radius * rotate
@@ -128,7 +146,9 @@ class Utilities:
         left_corner = base_center + arrowhead_width / 2 * sign * rotate
         right_corner = base_center - arrowhead_width / 2 * sign * rotate
 
-        pygame.draw.polygon(self.surface, color, [tip, left_corner, right_corner])
+        self._renderer.draw_polygon(
+            self.surface, color, [tip, left_corner, right_corner]
+        )
 
         # Display measurement text if needed
         if show_measurement:
@@ -196,7 +216,7 @@ class Utilities:
         end_pos = (end_x, end_y)
 
         # Draw the main line
-        pygame.draw.line(surface, color, start_pos, end_pos, line_width)
+        self._renderer.draw_line(surface, color, start_pos, end_pos, line_width)
 
         # Calculate perpendicular angle
         perp_angle = angle_rad + math.pi / 2  # 90 degrees in radians
@@ -206,7 +226,7 @@ class Utilities:
         perp_start_y1 = start_pos[1] + perpendicular_length / 2 * math.sin(perp_angle)
         perp_start_x2 = start_pos[0] - perpendicular_length / 2 * math.cos(perp_angle)
         perp_start_y2 = start_pos[1] - perpendicular_length / 2 * math.sin(perp_angle)
-        pygame.draw.line(
+        self._renderer.draw_line(
             surface,
             color,
             (perp_start_x1, perp_start_y1),
@@ -219,7 +239,7 @@ class Utilities:
         perp_end_y1 = end_pos[1] + perpendicular_length / 2 * math.sin(perp_angle)
         perp_end_x2 = end_pos[0] - perpendicular_length / 2 * math.cos(perp_angle)
         perp_end_y2 = end_pos[1] - perpendicular_length / 2 * math.sin(perp_angle)
-        pygame.draw.line(
+        self._renderer.draw_line(
             surface,
             color,
             (perp_end_x1, perp_end_y1),
@@ -256,7 +276,7 @@ class Utilities:
         center,
         angle,
         color=(255, 255, 255),
-        radius=30,
+        radius: float = 30,
         line_width=2,
         perpendicular_length=10,
         font=None,
@@ -295,14 +315,14 @@ class Utilities:
         end_angle = start_angle + sign * arc_angle
 
         # Draw the arc
-        arc_points = [None] * num_points
+        arc_points: list[tuple[float, float]] = []
         for i in range(num_points):
             t = i / (num_points - 1)
             theta = start_angle + sign * (arc_angle * t)
             pos = center + radius * np.array([np.cos(theta), np.sin(theta)])
-            arc_points[i] = pos
+            arc_points.append(tuple(pos))
 
-        pygame.draw.lines(surface, color, False, arc_points, line_width)
+        self._renderer.draw_lines(surface, color, False, arc_points, line_width)
 
         # Draw perpendicular markers at the endpoints
         # Start point - use radial direction (from center to point)
@@ -313,7 +333,7 @@ class Utilities:
         start_inner = start_point - (perpendicular_length / 2) * start_vector
         start_outer = start_point + (perpendicular_length / 2) * start_vector
 
-        pygame.draw.line(surface, color, start_inner, start_outer, line_width)
+        self._renderer.draw_line(surface, color, start_inner, start_outer, line_width)
 
         # End point - use radial direction
         end_vector = np.array([np.cos(end_angle), np.sin(end_angle)])
@@ -323,7 +343,7 @@ class Utilities:
         end_inner = end_point - (perpendicular_length / 2) * end_vector
         end_outer = end_point + (perpendicular_length / 2) * end_vector
 
-        pygame.draw.line(surface, color, end_inner, end_outer, line_width)
+        self._renderer.draw_line(surface, color, end_inner, end_outer, line_width)
 
         # Display measurement text if needed
         if show_measurement:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-import pygame
 from milliampere_dp.rendering import Color
 
 from milliampere_xai.rendering._vessel import VesselRender
@@ -21,9 +20,16 @@ class NedRender(VesselRender):
         title="Global map in NED-frame",
         window_width=450,
         window_height=450,
+        renderer=None,
     ):
         super().__init__(
-            screen, window_pos, self.SCALE, title, window_width, window_height
+            screen,
+            window_pos,
+            self.SCALE,
+            title,
+            window_width,
+            window_height,
+            renderer=renderer,
         )
 
     def _draw_grid(
@@ -59,11 +65,11 @@ class NedRender(VesselRender):
 
         # draw verticals
         while y < W:
-            pygame.draw.line(self.surface, color, (y, 0), (y, H), width)
+            self._renderer.draw_line(self.surface, color, (y, 0), (y, H), width)
             y += px
 
         while x < H:
-            pygame.draw.line(self.surface, color, (0, x), (W, x), width)
+            self._renderer.draw_line(self.surface, color, (0, x), (W, x), width)
             x += px
 
     def render(self, x_ned_err, y_ned_err, psi_err, target_pose):
@@ -100,13 +106,13 @@ class NedRender(VesselRender):
 
         # Convert world \u2192 pixels and draw
         self.vessel_surface.fill(Color.AGENT_BLACK.value)
-        pygame.draw.polygon(
+        self._renderer.draw_polygon(
             self.vessel_surface, Color.AGENT_BLUE.value, self._world_2_pixels(shape)
         )
-        pygame.draw.polygon(
+        self._renderer.draw_polygon(
             self.vessel_surface, Color.BLACK.value, self._world_2_pixels(triangle)
         )
-        pygame.draw.circle(
+        self._renderer.draw_circle(
             self.vessel_surface,
             Color.BLACK.value,
             self._world_2_pixels(circle).ravel(),

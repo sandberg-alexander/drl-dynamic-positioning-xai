@@ -26,9 +26,16 @@ class BodyRender(VesselRender):
         title="State and desired actuator view in BODY-frame",
         window_width=450,
         window_height=450,
+        renderer=None,
     ):
         super().__init__(
-            screen, window_pos, self.SCALE, title, window_width, window_height
+            screen,
+            window_pos,
+            self.SCALE,
+            title,
+            window_width,
+            window_height,
+            renderer=renderer,
         )
 
         self.label_font = pygame.font.SysFont("DejaVu Sans", 12)
@@ -74,15 +81,17 @@ class BodyRender(VesselRender):
                 Color.DESIRED_LIGHT_YELLOW.value,
                 np.array([px, py]),
             )
-            pygame.draw.line(
+            self._renderer.draw_line(
                 self.surface,
                 Color.DESIRED_LIGHT_YELLOW.value,
                 (px - 10 * np.cos(perp_angle), py - 10 * np.sin(perp_angle)),
                 (px + 10 * np.cos(perp_angle), py + 10 * np.sin(perp_angle)),
                 width=2,
             )
-            pygame.draw.circle(self.surface, Color.BLACK.value, (px, py), radius=3)
-            pygame.draw.circle(
+            self._renderer.draw_circle(
+                self.surface, Color.BLACK.value, (px, py), radius=3
+            )
+            self._renderer.draw_circle(
                 self.surface,
                 Color.BLACK.value,
                 (px - 7 * np.sin(perp_angle), py + 7 * np.cos(perp_angle)),
@@ -129,7 +138,7 @@ class BodyRender(VesselRender):
         angle,
         center,
         color,
-        radius=10,
+        radius: float = 10,
         line_width=2,
         arrowhead_length=10,
         arrowhead_width=10,
@@ -157,13 +166,15 @@ class BodyRender(VesselRender):
         tip_angle = start_angle + sign * (line_arc_angle + arrowhead_arc_angle)
 
         if line_arc_length > 0:
-            arc_points = [None] * num_points
+            arc_points: list[tuple[float, float]] = []
             for i in range(num_points):
                 t = i / (num_points - 1)
                 theta = start_angle + sign * (line_arc_angle * t)
                 pos = center + radius * np.array([np.cos(theta), np.sin(theta)])
-                arc_points[i] = pos
-            pygame.draw.lines(self.surface, color, False, arc_points, line_width)
+                arc_points.append(tuple(pos))
+            self._renderer.draw_lines(
+                self.surface, color, False, arc_points, line_width
+            )
 
         rotate = np.array([np.cos(tip_angle), np.sin(tip_angle)])
         tip = center + radius * rotate
@@ -173,7 +184,9 @@ class BodyRender(VesselRender):
         left_corner = base_center + arrowhead_width / 2 * sign * rotate
         right_corner = base_center - arrowhead_width / 2 * sign * rotate
 
-        pygame.draw.polygon(self.surface, color, [tip, left_corner, right_corner])
+        self._renderer.draw_polygon(
+            self.surface, color, [tip, left_corner, right_corner]
+        )
 
     def calculate_total_moment(self, thrusters):
         total_moment_prime = 0.0
@@ -203,12 +216,12 @@ class BodyRender(VesselRender):
         col = Color.OCEAN_GRID.value
 
         # draw circle
-        pygame.draw.circle(surf, col, (cx, cy), radius, width=2)
+        self._renderer.draw_circle(surf, col, (cx, cy), radius, width=2)
 
         # draw the four little triangles (same as before)
         tri_h, tri_w = 30, 8
         # N
-        pygame.draw.polygon(
+        self._renderer.draw_polygon(
             surf,
             col,
             [
@@ -218,7 +231,7 @@ class BodyRender(VesselRender):
             ],
         )
         # E
-        pygame.draw.polygon(
+        self._renderer.draw_polygon(
             surf,
             col,
             [
@@ -228,7 +241,7 @@ class BodyRender(VesselRender):
             ],
         )
         # S
-        pygame.draw.polygon(
+        self._renderer.draw_polygon(
             surf,
             col,
             [
@@ -238,7 +251,7 @@ class BodyRender(VesselRender):
             ],
         )
         # W
-        pygame.draw.polygon(
+        self._renderer.draw_polygon(
             surf,
             col,
             [

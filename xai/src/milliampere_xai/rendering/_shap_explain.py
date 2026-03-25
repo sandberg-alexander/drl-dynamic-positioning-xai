@@ -33,9 +33,17 @@ class ShapExplainRender(VesselRender, Utilities):
         title="Desired total trust force/moment explained in BODY-frame",
         window_width=450,
         window_height=450,
+        renderer=None,
     ):
         VesselRender.__init__(
-            self, screen, window_pos, self.SCALE, title, window_width, window_height
+            self,
+            screen,
+            window_pos,
+            self.SCALE,
+            title,
+            window_width,
+            window_height,
+            renderer=renderer,
         )
         Utilities.__init__(self)
 
@@ -230,7 +238,7 @@ class ShapExplainRender(VesselRender, Utilities):
                 np.deg2rad(psi_tilde),
                 Color.RED.value,
                 radius=self._scalar2pygame(VESSEL_LENGTH / 2) + self.explain_offset,
-                label=f"{psi_tilde:.0f} °",
+                label=f"{psi_tilde:.0f} \u00b0",
             )
         elif self.idx == 3:
             if u_hat > 0:
@@ -297,7 +305,7 @@ class ShapExplainRender(VesselRender, Utilities):
                 Color.RED.value,
                 radius=self._scalar2pygame(VESSEL_LENGTH / 2) + self.explain_offset,
                 show_measurement=True,
-                label=f"{r_hat * 112.6 / (360 * 2):.0f} °/s",
+                label=f"{r_hat * 112.6 / (360 * 2):.0f} \u00b0/s",
             )
 
         error = np.array([tot_thrust, tot_angle, tot_angular_thrust]) - np.array(
