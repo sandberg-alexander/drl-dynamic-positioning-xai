@@ -31,7 +31,7 @@ jobs:
           uv pip install --system -e "milliampere_dp/[dev]"
           uv pip install --system -e "ros_packages/milliampere_env"
           uv pip install --system -e "drl/[dev]"
-          uv pip install --system -e "xai/[dev]"
+          uv pip install --system -e "xai/[dev,web]"
 
       - name: Ruff check
         run: ruff check --no-fix --exclude "data/" .
@@ -61,7 +61,8 @@ jobs:
           uv pip install --system -e "milliampere_dp/[dev]"
           uv pip install --system -e "ros_packages/milliampere_env"
           uv pip install --system -e "drl/[dev]"
-          uv pip install --system -e "xai/[dev]"
+          uv pip install --system -e "xai/[dev,web]"
+          uv pip install --system httpx
 
       - name: Test milliampere_dp
         run: cd milliampere_dp && python -m pytest --cov=milliampere_dp --cov-report=term-missing --tb=short -q
@@ -77,3 +78,29 @@ jobs:
 
       - name: Integration tests
         run: python -m pytest tests/integration/ --tb=short -q
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test

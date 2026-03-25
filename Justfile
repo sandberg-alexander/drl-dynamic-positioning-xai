@@ -127,6 +127,28 @@ release-dry increment="PATCH":
 changelog:
     .venv/bin/cz changelog
 
+# --- Web dashboard ---
+
+# Install web dashboard dependencies
+web-install:
+    cd web && npm ci
+
+# Start web dashboard dev server (proxies /ws to localhost:8080)
+web-dev:
+    cd web && npx vite
+
+# Build web dashboard for production
+web-build:
+    cd web && npx vite build
+
+# Run web dashboard tests
+web-test:
+    cd web && npx vitest run
+
+# Type-check web dashboard
+web-typecheck:
+    cd web && npx tsc --noEmit
+
 # --- Cleanup ---
 
 # Remove Python cache files

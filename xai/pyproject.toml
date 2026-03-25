@@ -36,9 +36,11 @@ Issues = "https://github.com/sandberg-alexander/drl-dynamic-positioning-xai/issu
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "pytest-cov>=4.0"]
+web = ["fastapi>=0.100,<1", "uvicorn[standard]>=0.24,<1", "msgpack>=1.0,<2"]
 
 [project.scripts]
 xai-explain = "milliampere_xai.shap_explainer:main"
+xai-web = "milliampere_xai.server.app:main"
 
 [tool.uv.sources]
 milliampere-dp = { workspace = true }

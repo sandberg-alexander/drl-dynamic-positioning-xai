@@ -31,6 +31,10 @@ from milliampere_xai.model_wrappers import (
 )
 from milliampere_xai.rendering import RenderExplanation
 
+# Lazy-imported when --web or --web-only is used
+_web_server: object | None = None  # WebServer instance
+_pygame_active = True  # Tracks whether pygame is initialized
+
 
 class Agent:
     """ROS subscriber that receives observations, actions,
@@ -113,6 +117,13 @@ class Agent:
         return int(self.end - self.start)
 
 
+def _set_mode(agent: Agent, mode: int) -> None:
+    """Unified mode-setting for both pygame keyboard and web keyboard input."""
+    agent.mode_msg.mode = mode
+    agent.mode_flag = mode
+    agent.pub_mode.publish(agent.mode_msg)
+
+
 def _signal_handler(sig, frame):
     """Graceful shutdown on SIGINT/SIGTERM."""
     import rospy
@@ -124,7 +135,8 @@ def _signal_handler(sig, frame):
         rospy.sleep(0.5)
     except Exception:
         pass
-    pygame.quit()
+    if _pygame_active:
+        pygame.quit()
     time.sleep(2)
     os._exit(0)
 
@@ -139,6 +151,8 @@ def main():
 
     from milliampere_xai import __version__
 
+    global _pygame_active, _web_server
+
     parser = argparse.ArgumentParser(description="XAI SHAP explanation dashboard")
     parser.add_argument(
         "--gpu",
@@ -147,15 +161,39 @@ def main():
     )
     parser.add_argument("--model", default=None, help="Override model path")
     parser.add_argument("--env-config", default=None, help="Override env config path")
+    parser.add_argument(
+        "--web",
+        action="store_true",
+        help="Enable web dashboard alongside pygame (serves at --port)",
+    )
+    parser.add_argument(
+        "--web-only",
+        action="store_true",
+        help="Web dashboard only, no pygame (headless mode for SSH/WSL)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Web dashboard port (default: 8080)",
+    )
     args = parser.parse_args()
+
+    use_web = args.web or args.web_only
+    use_pygame = not args.web_only
+    _pygame_active = use_pygame
 
     model_path = (
         args.model or "/app/models/training_20250404_165037/models/best_model.zip"
     )
     env_config = args.env_config or "/app/configs/env/legacy/v4_equivalent.yaml"
 
-    if not args.gpu:
+    if use_pygame and not args.gpu:
         os.environ["LIBGL_ALWAYS_SOFTWARE"] = "1"
+
+    render_mode = (
+        "web-only" if args.web_only else ("pygame+web" if args.web else "pygame")
+    )
 
     print(f"""
     ### ___T_ ################################################
@@ -167,9 +205,9 @@ def main():
       \\/7  [|_     xai-explain
     ##########################################################
 
-    Starting a XAI run ({"GPU" if args.gpu else "software"} rendering) ...
+    Starting a XAI run ({render_mode}) ...
 
-    Keyboard controls (in dashboard window):
+    Keyboard controls (in dashboard window or browser):
           '0' - DP mode              (idle dynamic positioning)
           '1' - DP test              (waypoint sequence, records video)
           '2' - North following      (northward path, records video)
@@ -223,13 +261,28 @@ def main():
         ]
     )
 
-    # init pygame (font subsystem needs explicit init before creating windows)
-    pygame.init()
-    render = RenderExplanation()
     fps = 5
-    clock = pygame.time.Clock()
     sleep_time = 0.1
     agent = Agent()
+
+    # Start web server in background thread if requested
+    if use_web:
+        from milliampere_xai.server.app import WebServer
+
+        _web_server = WebServer(
+            on_keyboard=lambda key: _set_mode(agent, key),
+            port=args.port,
+        )
+        _web_server.start()  # type: ignore[union-attr]
+        print(f"    Web dashboard: http://localhost:{args.port}\n")
+
+    # init pygame (font subsystem needs explicit init before creating windows)
+    render = None
+    clock = None
+    if use_pygame:
+        pygame.init()
+        render = RenderExplanation()
+        clock = pygame.time.Clock()
 
     ros_master_uri = os.environ.get("ROS_MASTER_URI")
     if ros_master_uri == "http://simulator_local:11311":
@@ -248,45 +301,39 @@ def main():
     # MAIN LOOP
     try:
         while not rospy.is_shutdown():
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    print("event quit")
-                    rospy.signal_shutdown("User closed window")
-                # Keyboard defined inputs
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_5:  # VF_SAMPLE
-                        agent.mode_msg.mode = 5
-                        agent.mode_flag = 5
-                        agent.pub_mode.publish(agent.mode_msg)
-                    elif event.key == pygame.K_4:  # ACTION_SAMPLE
-                        agent.mode_msg.mode = 4
-                        agent.mode_flag = 4
-                        agent.pub_mode.publish(agent.mode_msg)
-                    elif event.key in (pygame.K_1, pygame.K_2, pygame.K_3):
-                        mode_num = event.key - pygame.K_0
-                        agent.mode_msg.mode = mode_num
-                        agent.mode_flag = mode_num
-                        agent.pub_mode.publish(agent.mode_msg)
-                        # Start video recording with current surface size
-                        surf = pygame.display.get_surface()
-                        w, h = surf.get_size()
-                        out_fname = (
-                            f"{video_dir}/{time.strftime('%Y%m%d_%H%M%S')}{video_ext}"
-                        )
-                        video_writer = cv2.VideoWriter(out_fname, fourcc, fps, (w, h))
-                        if not video_writer.isOpened():
-                            print(
-                                f"Warning: could not open video "
-                                f"writer ({w}x{h}) "
-                                f"at {out_fname}"
+            # Process pygame events (keyboard, window close)
+            if use_pygame:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        print("event quit")
+                        rospy.signal_shutdown("User closed window")
+                    if event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_5:  # VF_SAMPLE
+                            _set_mode(agent, 5)
+                        elif event.key == pygame.K_4:  # ACTION_SAMPLE
+                            _set_mode(agent, 4)
+                        elif event.key in (pygame.K_1, pygame.K_2, pygame.K_3):
+                            mode_num = event.key - pygame.K_0
+                            _set_mode(agent, mode_num)
+                            # Start video recording with current surface size
+                            surf = pygame.display.get_surface()
+                            w, h = surf.get_size()
+                            ts = time.strftime("%Y%m%d_%H%M%S")
+                            out_fname = f"{video_dir}/{ts}{video_ext}"
+                            video_writer = cv2.VideoWriter(
+                                out_fname, fourcc, fps, (w, h)
                             )
-                            video_writer = None
-                        else:
-                            print(f"Recording to {out_fname} ({w}x{h})")
-                    elif event.key == pygame.K_0:  # DP
-                        agent.mode_msg.mode = 0
-                        agent.mode_flag = 0
-                        agent.pub_mode.publish(agent.mode_msg)
+                            if not video_writer.isOpened():
+                                print(
+                                    f"Warning: could not open video "
+                                    f"writer ({w}x{h}) "
+                                    f"at {out_fname}"
+                                )
+                                video_writer = None
+                            else:
+                                print(f"Recording to {out_fname} ({w}x{h})")
+                        elif event.key == pygame.K_0:  # DP
+                            _set_mode(agent, 0)
 
             if agent.mode_msg.mode == 5 and agent.mode_flag == 0:
                 latest = max(
@@ -344,10 +391,10 @@ def main():
             v_hat = obs[4] * MAX_LINEAR_SPEED * 2
             r_hat = obs[5] * MAX_ANGULAR_SPEED * 2
 
-            # cap fps to fps limit
-            clock.tick(fps)
-            try:
-                render.render_frame(
+            # Broadcast frame to web clients
+            if use_web and _web_server is not None:
+                _broadcast_web_frame(
+                    _web_server,
                     shap_values_action_list,
                     shap_values_value_list,
                     actuator_ref,
@@ -368,23 +415,49 @@ def main():
                     agent.get_time(),
                     epsilon_ned=agent.epsilon_ned,
                 )
-            except pygame.error as e:
-                print("Pygame error during rendering:", e)
-                break
 
-            if agent.mode_msg.mode in [1, 2, 3]:
-                if video_writer is not None:
-                    surface = pygame.display.get_surface()
-                    frame = pygame.surfarray.array3d(surface)  # (W, H, 3) in RGB
-                    frame = np.transpose(frame, (1, 0, 2))  # -> (H, W, 3)
-                    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                    video_writer.write(frame)
+            # Pygame rendering
+            if use_pygame and render is not None and clock is not None:
+                clock.tick(fps)
+                try:
+                    render.render_frame(
+                        shap_values_action_list,
+                        shap_values_value_list,
+                        actuator_ref,
+                        tot_thrust,
+                        tot_angle,
+                        tot_angular_thrust,
+                        x_tilde,
+                        y_tilde,
+                        psi_tilde,
+                        u_hat,
+                        v_hat,
+                        r_hat,
+                        base_vectors,
+                        action_low,
+                        action_high,
+                        target_pose,
+                        agent.time_step,
+                        agent.get_time(),
+                        epsilon_ned=agent.epsilon_ned,
+                    )
+                except pygame.error as e:
+                    print("Pygame error during rendering:", e)
+                    break
 
-                if agent.mode_flag == 0:
+                if agent.mode_msg.mode in [1, 2, 3]:
                     if video_writer is not None:
-                        video_writer.release()
-                        video_writer = None
-                    agent.mode_msg.mode = 0
+                        surface = pygame.display.get_surface()
+                        frame = pygame.surfarray.array3d(surface)  # (W, H, 3) in RGB
+                        frame = np.transpose(frame, (1, 0, 2))  # -> (H, W, 3)
+                        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                        video_writer.write(frame)
+
+                    if agent.mode_flag == 0:
+                        if video_writer is not None:
+                            video_writer.release()
+                            video_writer = None
+                        agent.mode_msg.mode = 0
 
             try:
                 rospy.sleep(sleep_time)
@@ -393,10 +466,81 @@ def main():
     except Exception as e:
         print(f"Exception in main loop: {e}")
     finally:
-        print("Quitting pygame...")
-        pygame.quit()
+        if use_pygame:
+            print("Quitting pygame...")
+            pygame.quit()
         if video_writer is not None:
             video_writer.release()
+
+
+def _broadcast_web_frame(
+    server: object,
+    shap_values_action_list,
+    shap_values_value_list,
+    actuator_ref,
+    tot_thrust,
+    tot_angle,
+    tot_angular_thrust,
+    x_tilde,
+    y_tilde,
+    psi_tilde,
+    u_hat,
+    v_hat,
+    r_hat,
+    base_vectors,
+    action_low,
+    action_high,
+    target_pose,
+    time_step,
+    time_seconds,
+    epsilon_ned=None,
+) -> None:
+    """Construct a RenderFrame and broadcast it to web clients via msgpack."""
+    import msgpack
+    from milliampere_dp.rendering.frames import (
+        ActuatorState,
+        RenderFrame,
+        ShapFrame,
+        VesselState,
+    )
+
+    frame = RenderFrame(
+        vessel=VesselState(
+            x_tilde=float(x_tilde),
+            y_tilde=float(y_tilde),
+            psi_tilde=float(psi_tilde),
+            u_hat=float(u_hat),
+            v_hat=float(v_hat),
+            r_hat=float(r_hat),
+            target_pose=(
+                float(target_pose[0]),
+                float(target_pose[1]),
+                float(target_pose[2]),
+            ),
+            epsilon_ned=(
+                (float(epsilon_ned[0]), float(epsilon_ned[1]), float(epsilon_ned[2]))
+                if epsilon_ned is not None
+                else (0.0, 0.0, 0.0)
+            ),
+        ),
+        actuators=ActuatorState(
+            actuator_ref=[(float(t), float(a)) for t, a in actuator_ref],
+            tot_thrust=float(tot_thrust),
+            tot_angle=float(tot_angle),
+            tot_angular_thrust=float(tot_angular_thrust),
+        ),
+        shap=ShapFrame(
+            shap_values_action=shap_values_action_list,
+            shap_values_value=shap_values_value_list,
+            base_vectors=[float(v) for v in base_vectors],
+            action_low=[float(v) for v in action_low],
+            action_high=[float(v) for v in action_high],
+        ),
+        time_step=int(time_step),
+        time_seconds=float(time_seconds),
+    )
+    data = msgpack.packb(frame.model_dump())
+    server.broadcast_frame(data)  # type: ignore[attr-defined]
 
 
 if __name__ == "__main__":
@@ -404,5 +548,6 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         print("Exception occurred:", e)
-        pygame.quit()
+        if _pygame_active:
+            pygame.quit()
         sys.exit(1)

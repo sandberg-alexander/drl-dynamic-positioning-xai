@@ -44,5 +44,9 @@ data/models/training_*/
 .DS_Store
 Thumbs.db
 
+# Node / Web dashboard
+node_modules/
+web/dist/
+
 # Docker
 docker/.env.local

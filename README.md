@@ -61,8 +61,17 @@ drl-dynamic-positioning-xai/
 │   ├── src/milliampere_xai/
 │   │   ├── model_wrappers.py    # Obs2ActionWrapper, Obs2ValueWrapper
 │   │   ├── shap_explainer.py    # SHAP pipeline + xai-explain entry point
-│   │   └── dashboard.py         # Full pygame rendering dashboard
-│   └── tests/                   # 8 tests
+│   │   ├── rendering/           # Decomposed dashboard (9 modules)
+│   │   └── server/              # FastAPI WebSocket server for web dashboard
+│   └── tests/                   # 22 tests
+│
+├── web/                         # Browser-based XAI dashboard (Vite 8 + TypeScript)
+│   ├── src/
+│   │   ├── main.ts              # WebSocket + keyboard input
+│   │   ├── worker.ts            # OffscreenCanvas render loop
+│   │   ├── renderer.ts          # Canvas 2D drawing primitives
+│   │   └── views/               # body, ned, shap_bars, shap_explain
+│   └── src/__tests__/           # 18 Vitest tests
 │
 ├── configs/
 │   ├── env/                     # Environment YAML configs
@@ -140,7 +149,7 @@ just up-gpu         # NVIDIA GPU acceleration
 
 ### 4. Enable X11 forwarding
 
-Required for the viewer and XAI dashboard:
+Required for the viewer and the pygame XAI dashboard (not needed for `--web-only`):
 ```bash
 xhost +local:docker
 ```
@@ -227,12 +236,38 @@ docker exec -it drl bash -c 'source /root/catkin_ws/devel/setup.bash && python3 
 
 ### Start the XAI dashboard
 
-Requires the deployer to be running. Separate terminal (requires X11):
+Requires the deployer to be running. Three rendering modes are available:
+
+**Pygame (default, requires X11):**
 ```bash
 docker exec -it xai bash -c 'source /root/catkin_ws/devel/setup.bash && xai-explain --gpu'
 ```
 
-Keyboard inputs in the dashboard window control the deployer mode (keys 0-5, same as the table above).
+**Web dashboard (no X11 needed — works over SSH, WSL, headless):**
+```bash
+docker exec -it xai bash -c 'source /root/catkin_ws/devel/setup.bash && xai-explain --web-only'
+# Then open http://localhost:8080 in your browser
+```
+
+**Both simultaneously (pygame window + web dashboard):**
+```bash
+docker exec -it xai bash -c 'source /root/catkin_ws/devel/setup.bash && xai-explain --web --gpu'
+```
+
+The web dashboard streams frames via WebSocket using MessagePack serialization. Rendering runs in a Web Worker via OffscreenCanvas for guaranteed input responsiveness. Keyboard controls (keys 0-5) work in both the pygame window and the browser.
+
+| Flag | Rendering | X11 needed? | Port |
+|------|-----------|-------------|------|
+| *(none)* | pygame only | Yes | — |
+| `--web` | pygame + browser | Yes | 8080 |
+| `--web-only` | browser only | No | 8080 |
+| `--port N` | override web port | — | N |
+
+**Demo mode** (no ROS/Docker needed — test the web dashboard with synthetic data):
+```bash
+xai-web --demo
+# Open http://localhost:8080
+```
 
 ### Plot results (host-side)
 
@@ -262,7 +297,8 @@ gust: 5.0"'
 
 GitHub Actions runs on every push to `main` and `rework/*` branches:
 - **Lint** -- ruff check + format, pyright type checking (basic mode)
-- **Test** -- all unit tests + integration tests (168 unit + 3 integration)
+- **Test** -- all Python unit tests + integration tests
+- **Web** -- TypeScript type check, Vite build, Vitest tests
 
 ## Development
 
@@ -272,10 +308,11 @@ GitHub Actions runs on every push to `main` and `rework/*` branches:
 just test               # milliampere_dp (69 tests)
 just test-env           # milliampere_env (54 tests, uses MockTransport)
 just test-drl           # milliampere_drl (37 tests)
-just test-xai           # milliampere_xai (8 tests)
+just test-xai           # milliampere_xai (22 tests)
 just test-integration   # full DRL episode with MockTransport (3 tests)
-just test-all           # all tests
-just test-cov           # milliampere_dp with coverage
+just test-all           # all Python tests
+just test-cov           # all Python tests with coverage
+just web-test           # web dashboard (18 Vitest tests)
 ```
 
 ### Lint, format, and type check
@@ -283,6 +320,7 @@ just test-cov           # milliampere_dp with coverage
 ```bash
 just lint           # ruff check + format + pyright via pre-commit
 just type-check     # pyright only (0 errors expected, warnings OK for ROS imports)
+just web-typecheck  # TypeScript type check (tsc --noEmit)
 ```
 
 ### Live editing in Docker
@@ -336,8 +374,9 @@ Run `just --list` for a complete list:
 ```
 just setup          # Full dev environment setup
 just install        # Install all packages in editable mode
-just test-all       # Run all 168 tests
+just test-all       # Run all Python tests
 just lint           # Ruff lint + format
+just type-check     # Pyright type checking
 just compose-local  # Generate compose for local simulation
 just compose-remote # Generate compose for remote connection
 just build          # Build Docker images (base first, then drl/xai)
@@ -348,6 +387,11 @@ just evaluate-all   # Evaluate all models in a training run
 just plot-eval      # Plot evaluation rewards
 just plot-run       # Plot deployment run data
 just plot-spline    # Plot spline reference vs realised path
+just web-install    # Install web dashboard dependencies
+just web-dev        # Start web dev server with HMR
+just web-build      # Build web dashboard for production
+just web-test       # Run web dashboard tests
+just web-typecheck  # TypeScript type check
 just clean          # Remove Python cache files
 ```
 

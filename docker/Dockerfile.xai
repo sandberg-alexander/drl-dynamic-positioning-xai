@@ -1,9 +1,23 @@
-# Dockerfile.xai
+# Dockerfile.xai — multi-stage: build web frontend, then install Python packages
+
+# Stage 1: Build web dashboard static assets
+FROM node:22-alpine AS web-builder
+WORKDIR /app/web
+COPY web/package.json web/package-lock.json* ./
+RUN npm ci
+COPY web/ ./
+RUN npm run build
+
+# Stage 2: ROS + Python XAI package
 FROM my-ros-base:latest
 
-# Install milliampere_xai package (milliampere_dp already at /app/milliampere_dp/ from base)
+# Install milliampere_xai with web extras
 WORKDIR /app
 COPY xai/ /app/xai/
-RUN uv pip install --system --no-cache --no-sources /app/milliampere_dp/ /app/xai/
+RUN uv pip install --system --no-cache --no-sources /app/milliampere_dp/ "/app/xai/[web]"
 
+# Copy built web assets from stage 1
+COPY --from=web-builder /app/web/dist /app/web/dist
+
+EXPOSE 8080
 CMD ["tail", "-f", "/dev/null"]

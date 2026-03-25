@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>milliAmpere XAI Dashboard</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        background: #1a1a1a;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        font-family: "DejaVu Sans", sans-serif;
+        color: #ccc;
+      }
+      #canvas {
+        border: 1px solid #333;
+        background: #f0f0f0;
+      }
+      .status-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 12px;
+        font-size: 12px;
+      }
+      .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #ff4444;
+        transition: background 0.3s;
+      }
+      .status-dot.connected {
+        background: #44ff44;
+      }
+      .controls {
+        margin-top: 8px;
+        font-size: 11px;
+        color: #888;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas" width="975" height="975"></canvas>
+    <div class="status-bar">
+      <div id="status-dot" class="status-dot"></div>
+      <span id="status-text">Disconnected</span>
+    </div>
+    <div class="controls">
+      Keys 0-5: DP mode | DP test | North | Spline | Action sample | VF sample
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

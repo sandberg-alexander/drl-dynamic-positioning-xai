@@ -58,6 +58,8 @@ services:
     - ../configs:/app/configs:ro
     - ../milliampere_dp/src/milliampere_dp:/usr/local/lib/python3.8/dist-packages/milliampere_dp:ro
     - ../ros_packages/milliampere_env/src/milliampere_env:/root/catkin_ws/src/milliampere_env/src/milliampere_env:ro
+    ports:
+    - 8080:8080
     command: 'bash -c '' source /root/catkin_ws/devel/setup.bash && source /opt/ros/noetic/setup.bash && tail -f /dev/null ''
 
       '
