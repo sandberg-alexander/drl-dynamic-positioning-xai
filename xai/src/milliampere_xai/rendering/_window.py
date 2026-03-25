@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pygame
 from milliampere_dp.rendering import Color
@@ -50,7 +52,7 @@ class Window:
         angle,
         arrow_length,
         color,
-        start_pos=np.zeros(2),
+        start_pos: Any = np.zeros(2),
         arrowhead_length=10,
         arrowhead_width=10,
         line_width=2,
