@@ -1,3 +1,14 @@
+## v0.8.1 (2026-03-25)
+
+### Feat
+
+- adopt PygameRenderer across all rendering modules, full pyright coverage
+
+### Fix
+
+- add --no-sources to uv pip install in Dockerfiles
+- exclude xai rendering modules from pyright
+
 ## v0.8.0 (2026-03-23)
 
 ### Feat

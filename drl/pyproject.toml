@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "milliampere-drl"
-version = "0.8.0"
+version = "0.8.1"
 description = "DRL training, evaluation, and deployment for milliAmpere1 DP"
 requires-python = ">=3.8"
 license = "MIT"
