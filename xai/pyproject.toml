@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "milliampere-xai"
-version = "0.8.1"
+version = "0.9.0"
 description = "SHAP-based XAI explainer and dashboard for milliAmpere1 DRL-DP"
 requires-python = ">=3.8"
 license = "MIT"

@@ -1,3 +1,14 @@
+## v0.9.0 (2026-03-25)
+
+### Feat
+
+- add browser-based XAI dashboard via WebSocket (Phase 3)
+
+### Fix
+
+- pyright type error in demo_loop and moment marker test
+- widen draw_arrow start_pos type for pyright CI
+
 ## v0.8.1 (2026-03-25)
 
 ### Feat
