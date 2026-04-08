@@ -1,4 +1,4 @@
-## v0.9.0 (2026-03-25)
+## v1.9.0 (2026-03-25)
 
 ### Feat
 
@@ -9,7 +9,7 @@
 - pyright type error in demo_loop and moment marker test
 - widen draw_arrow start_pos type for pyright CI
 
-## v0.8.1 (2026-03-25)
+## v1.8.1 (2026-03-25)
 
 ### Feat
 
@@ -20,7 +20,7 @@
 - add --no-sources to uv pip install in Dockerfiles
 - exclude xai rendering modules from pyright
 
-## v0.8.0 (2026-03-23)
+## v1.8.0 (2026-03-23)
 
 ### Feat
 
@@ -30,19 +30,19 @@
 
 - pyright errors in PygameRenderer — use Any for surface type
 
-## v0.7.0 (2026-03-23)
+## v1.7.0 (2026-03-23)
 
 ### Feat
 
 - Phase 1 — extract shared rendering into milliampere_dp.rendering
 
-## v0.6.0 (2026-03-22)
+## v1.6.0 (2026-03-22)
 
 ### Feat
 
-- polish, velocity subscription, and version bump to 0.6.0
+- polish, velocity subscription, and version bump to 1.6.0
 
-## v0.5.0 (2026-03-21)
+## v1.5.0 (2026-03-21)
 
 ### Feat
 
@@ -55,7 +55,7 @@
 - add ruff exclusions for legacy and dashboard files in CI
 - install ruff and pyright explicitly in CI workflow
 
-## v0.4.0 (2026-03-21)
+## v1.4.0 (2026-03-21)
 
 ### Feat
 
@@ -77,13 +77,13 @@
 - move `custom_ros_msgs` to `ros_packages/`, delete `project_mAXAI/`
 - update Dockerfiles to pip-install packages, update compose volume mounts
 
-## v0.3.0 (2026-03-21)
+## v1.3.0 (2026-03-21)
 
 ### Feat
 
 - add DeployMode IntEnum replacing integer mode flags 0–5
 - enable ruff linting for application code in pre-commit
-- add unified version numbering (0.3.0) via importlib.metadata
+- add unified version numbering (1.3.0) via importlib.metadata
 - parameterize all plot scripts with argparse CLI
 - add `eval.py --all` flag (replaces `run_evaluation.sh`)
 - add `evaluate-all` and `up-gpu` Justfile recipes
@@ -108,7 +108,7 @@
 - merge `plot_run.py` + `plot_run2.py` into single parameterized script
 - add docstrings to 10 key classes in render_explanation.py
 
-## v0.2.0 (2026-03-16)
+## v1.2.0 (2026-03-16)
 
 ### Feat
 
@@ -130,7 +130,7 @@
 - add `--device` flag to train.py (auto|cpu|cuda), Ctrl+C stops cleanly via SB3 callback
 - archive old `gym_env` to `gym_env_legacy`
 
-## v0.1.0 (2026-03-15)
+## v1.1.0 (2026-03-15)
 
 ### Feat
 
