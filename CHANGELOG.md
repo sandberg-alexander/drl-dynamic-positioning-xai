@@ -1,3 +1,9 @@
+## v1.10.0 (2026-04-09)
+
+### Feat
+
+- add parallel training infrastructure (Phase 1)
+
 ## v1.9.0 (2026-03-25)
 
 ### Feat
