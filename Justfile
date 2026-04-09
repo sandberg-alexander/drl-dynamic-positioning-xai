@@ -76,9 +76,9 @@ train *args:
 train-parallel *args:
     docker exec -it drl bash -c 'source /root/catkin_ws/devel/setup.bash && drl-train --config /app/configs/training/default.yaml --no-wandb --n-envs $N_ENVS {{args}}'
 
-# Open standalone viewer for a simulator (e.g. just viewer 0 for sim_0)
-viewer sim_id="0":
-    docker exec -it drl bash -c 'source /root/catkin_ws/devel/setup.bash && ROS_MASTER_URI=http://sim_{{sim_id}}:11311 python3 -m milliampere_env.viewer'
+# Open standalone viewer for a simulator (e.g. just viewer 0 --gpu --fps 10)
+viewer sim_id="0" *args:
+    docker exec -it drl bash -c 'source /root/catkin_ws/devel/setup.bash && ROS_MASTER_URI=http://sim_{{sim_id}}:11311 python3 -m milliampere_env.viewer {{args}}'
 
 # Evaluate all models in a training run (runs inside drl container)
 evaluate-all run_dir episodes="5":
