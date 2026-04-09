@@ -66,7 +66,19 @@ lint:
 type-check:
     pyright
 
-# --- Evaluation (Docker) ---
+# --- Training & Evaluation (Docker) ---
+
+# Run training (single sim: just train, parallel: just train-parallel)
+train *args:
+    docker exec -it drl bash -c 'source /root/catkin_ws/devel/setup.bash && drl-train --config /app/configs/training/default.yaml --no-wandb {{args}}'
+
+# Run parallel training with N envs (default 4)
+train-parallel *args:
+    docker exec -it drl bash -c 'source /root/catkin_ws/devel/setup.bash && drl-train --config /app/configs/training/default.yaml --no-wandb --n-envs $N_ENVS {{args}}'
+
+# Open standalone viewer for a simulator (e.g. just viewer 0 for sim_0)
+viewer sim_id="0":
+    docker exec -it drl bash -c 'source /root/catkin_ws/devel/setup.bash && ROS_MASTER_URI=http://sim_{{sim_id}}:11311 python3 -m milliampere_env.viewer'
 
 # Evaluate all models in a training run (runs inside drl container)
 evaluate-all run_dir episodes="5":
@@ -97,8 +109,8 @@ compose-remote remote_ip:
     cd docker && python3 generate_compose.py remote --remote-ip {{remote_ip}}
 
 # Generate docker-compose for parallel training (N simulator instances)
-compose-parallel n_envs="4":
-    cd docker && python3 generate_compose.py parallel --n-envs {{n_envs}}
+compose-parallel n_envs="4" *args:
+    cd docker && python3 generate_compose.py parallel --n-envs {{n_envs}} {{args}}
 
 # Build all Docker images (base first, then drl/xai in parallel; pass extra args like --no-cache)
 build *args:
