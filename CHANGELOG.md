@@ -1,3 +1,14 @@
+## v1.11.0 (2026-04-09)
+
+### Feat
+
+- add viewer recipe, X11/GPU support to parallel compose
+- integrate SubprocVecEnv for parallel training (Phase 2)
+
+### Fix
+
+- pass extra args to viewer recipe
+
 ## v1.10.0 (2026-04-09)
 
 ### Feat
