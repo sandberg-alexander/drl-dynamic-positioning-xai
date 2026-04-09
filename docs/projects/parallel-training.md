@@ -145,25 +145,36 @@ Infrastructure for running N independent simulator containers in parallel.
 
 Code changes to parallelize training with `SubprocVecEnv`.
 
-- [ ] Create `make_env(env_id, config_path, sim_host, seed)` factory function in `train.py` (or new `env_factory.py` module)
-  - Sets `os.environ['ROS_MASTER_URI'] = f"http://{sim_host}:11311"` (e.g. `sim_0`, `sim_1`, ...)
-  - Sets `os.environ['ROS_HOSTNAME'] = "drl_container"`
-  - Calls `rospy.init_node(f"drl_train_{env_id}", anonymous=True)`
-  - Returns `gym.make("MilliAmpere1-v1", config_path=config_path)` wrapped with `Monitor`
-- [ ] Remove `rospy.init_node()` from `train.py` parent process (line 97)
-- [ ] Add `n_envs: int = 1` and `sim_host_prefix: str = "sim_"` to `TrainingConfig`
-- [ ] Conditionally create `SubprocVecEnv` (N>1) or `DummyVecEnv` (N=1) based on `n_envs`
-  - Use `start_method="spawn"` for `SubprocVecEnv`
-  - Replace `Monitor` with `VecMonitor` for vectorized envs
-- [ ] Update PPO creation: effective rollout buffer is `n_steps * n_envs` -- document interaction with `batch_size`
-- [ ] Verify callback compatibility with `VecEnv`:
-  - `SaveModelCallback` -- should work (operates on model, not env)
-  - `HParamCallback` -- should work
-  - `DPMetricsCallback` -- may need adaptation for vectorized `info` dicts
-- [ ] Graceful shutdown: ensure SIGINT handler properly closes all subprocess envs
-- [ ] Add `--n-envs` CLI argument to `drl-train`
-- [ ] Snapshot `n_envs` and `sim_host_prefix` into `training_config.yaml` run directory
-- [ ] Test with N=1 (regression) and N=4 (parallel) using running simulators
+**Files modified:**
+- `drl/src/milliampere_drl/train.py` — `_make_env` factory, `--n-envs` CLI, `DummyVecEnv`/`SubprocVecEnv` conditional
+- `drl/src/milliampere_drl/config.py` — `n_envs: int = 1` field on `TrainingConfig`
+- `drl/src/milliampere_drl/callbacks.py` — `DPMetricsCallback` fixed for VecEnv + actual info keys
+- `configs/training/default.yaml` — `n_envs: 1`
+
+**Action items:**
+- [x] Create `_make_env(rank, config_path, seed, log_dir)` factory in `train.py`
+  - Sets `ROS_MASTER_URI=http://sim_{rank}:11311` and `ROS_HOSTNAME=drl_container`
+  - Calls `rospy.init_node()`, imports `milliampere_env`, creates env + `Monitor` — all inside subprocess
+- [x] `n_envs=1`: `rospy.init_node()` in parent process, `DummyVecEnv` — identical to previous behavior
+- [x] `n_envs>1`: `SubprocVecEnv` with `start_method="forkserver"`, no rospy in parent
+- [x] Add `n_envs: int = Field(default=1, ge=1)` to `TrainingConfig`
+- [x] Add `n_envs: 1` to `configs/training/default.yaml`
+- [x] Add `--n-envs` CLI argument to `drl-train` (overrides config)
+- [x] Validate `batch_size` divides `n_steps * n_envs` with warning
+- [x] Fix `DPMetricsCallback`: use actual info keys (`epsilon`, `thrusters`), aggregate across all envs with `np.mean`
+- [x] PPO receives `vec_env` instead of bare `env`
+- [x] `finally` block calls `vec_env.close()` (properly shuts down subprocesses)
+- [x] Print `n_envs` in startup banner
+- [x] All 40 DRL unit tests pass
+- [ ] Test N=1 regression in Docker (single sim)
+- [ ] Test N=4 parallel in Docker (4 sims)
+
+**Implementation notes:**
+- `Monitor` wraps each env **inside** the factory (not `VecMonitor` outside) — avoids double-counting episode stats.
+- `forkserver` start method chosen over `fork` (ROS threading deadlock risk) and `spawn` (SB3 default but slower).
+- `_make_env` is a module-level function (not a closure inside `main`) so `cloudpickle` can serialize it for `SubprocVecEnv`.
+- `DPMetricsCallback` was previously a no-op — the keys it checked (`position_error`, `heading_error`, `total_thrust`) don't exist in `MilliAmpereEnv._get_info()`. Now uses actual keys: `epsilon` (body-frame error) and `thrusters` (RPM setpoints).
+- `total_timesteps` counts across all envs — with N=4 and 500k timesteps, training finishes in ~125k wall-clock steps per env.
 
 ### Phase 3 -- Parallel Evaluation
 

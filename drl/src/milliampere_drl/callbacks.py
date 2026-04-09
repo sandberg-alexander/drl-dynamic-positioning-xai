@@ -86,16 +86,26 @@ class HParamCallback(BaseCallback):
 
 
 class DPMetricsCallback(BaseCallback):
-    """Log domain-specific DP metrics (position error, heading error, thrust)."""
+    """Log domain-specific DP metrics averaged across all parallel envs."""
 
     def _on_step(self) -> bool:
-        infos = self.locals.get("infos", [{}])
-        if infos and isinstance(infos[0], dict):
-            info = infos[0]
-            if "position_error" in info:
-                self.logger.record("dp/position_error_m", info["position_error"])
-            if "heading_error" in info:
-                self.logger.record("dp/heading_error_deg", info["heading_error"])
-            if "total_thrust" in info:
-                self.logger.record("dp/total_thrust_N", info["total_thrust"])
+        infos = self.locals.get("infos", [])
+        pos_errors = []
+        heading_errors = []
+        thrusts = []
+        for info in infos:
+            if not isinstance(info, dict):
+                continue
+            if "epsilon" in info:
+                eps = info["epsilon"]
+                pos_errors.append(float(np.sqrt(eps[0] ** 2 + eps[1] ** 2)))
+                heading_errors.append(float(abs(eps[2])))
+            if "thrusters" in info:
+                thrusts.append(float(np.sum(np.abs(info["thrusters"]))))
+        if pos_errors:
+            self.logger.record("dp/position_error_m", np.mean(pos_errors))
+        if heading_errors:
+            self.logger.record("dp/heading_error_deg", np.mean(heading_errors))
+        if thrusts:
+            self.logger.record("dp/total_thrust_rpm", np.mean(thrusts))
         return True

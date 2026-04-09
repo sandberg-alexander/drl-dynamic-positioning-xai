@@ -18,6 +18,7 @@ class TrainingConfig(BaseModel):
 
     # Environment
     env_config: str = "configs/env/dp_positive_thrust.yaml"
+    n_envs: int = Field(default=1, ge=1)
 
     # PPO hyperparameters
     policy: str = "MlpPolicy"

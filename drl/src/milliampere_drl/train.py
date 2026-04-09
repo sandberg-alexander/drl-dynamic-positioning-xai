@@ -8,9 +8,36 @@ import shutil
 import signal
 import sys
 import traceback
+from collections.abc import Callable
 from datetime import datetime
 
 import yaml
+
+
+def _make_env(rank: int, config_path: str, seed: int, log_dir: str) -> Callable:
+    """Create an env factory for SubprocVecEnv.
+
+    Each factory runs in its own subprocess with an independent rospy node
+    connected to ``sim_{rank}`` via ROS_MASTER_URI.
+    """
+
+    def _init():
+        os.environ["ROS_MASTER_URI"] = f"http://sim_{rank}:11311"
+        os.environ["ROS_HOSTNAME"] = "drl_container"
+
+        import rospy
+
+        rospy.init_node(f"drl_train_{rank}", anonymous=True)
+
+        import gymnasium as gym
+        import milliampere_env  # noqa: F401 -- registers MilliAmpere1-v1
+        from stable_baselines3.common.monitor import Monitor
+
+        env = gym.make("MilliAmpere1-v1", config_path=config_path)
+        env.reset(seed=seed + rank)
+        return Monitor(env, filename=f"{log_dir}/env_{rank}")
+
+    return _init
 
 
 def main() -> None:
@@ -24,6 +51,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--no-wandb", action="store_true", help="Disable Weights & Biases logging"
+    )
+    parser.add_argument(
+        "--n-envs",
+        type=int,
+        default=None,
+        help="Number of parallel envs (overrides config)",
     )
     args = parser.parse_args()
 
@@ -42,6 +75,8 @@ def main() -> None:
         overrides["device"] = args.device
     if args.no_wandb:
         overrides["wandb_project"] = None
+    if args.n_envs is not None:
+        overrides["n_envs"] = args.n_envs
     if overrides:
         config = config.model_copy(update=overrides)
 
@@ -59,6 +94,7 @@ def main() -> None:
     Config: {args.config or "defaults"}
     Device: {config.device}
     Seed:   {config.seed}
+    Envs:   {config.n_envs}
     """)
 
     # Seed management
@@ -81,12 +117,9 @@ def main() -> None:
     if os.path.isfile(config.env_config):
         shutil.copy(config.env_config, f"{run_dir}/env_config.yaml")
 
-    # Lazy ROS imports
-    import gymnasium as gym
-    import milliampere_env  # noqa: F401 -- registers MilliAmpere1-v1
-    import rospy
+    # Lazy imports
     from stable_baselines3 import PPO
-    from stable_baselines3.common.monitor import Monitor
+    from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
     from milliampere_drl.callbacks import (
         DPMetricsCallback,
@@ -94,17 +127,42 @@ def main() -> None:
         SaveModelCallback,
     )
 
-    rospy.init_node("drl_train", anonymous=True)
+    # Validate batch_size divides rollout buffer
+    buffer_size = config.n_steps * config.n_envs
+    if buffer_size % config.batch_size != 0:
+        print(
+            f"Warning: batch_size ({config.batch_size}) does not divide "
+            f"n_steps * n_envs ({config.n_steps} * {config.n_envs} = {buffer_size}). "
+            f"SB3 will truncate the last minibatch."
+        )
 
-    # Create environment
-    env = gym.make("MilliAmpere1-v1", config_path=config.env_config)
-    env.reset(seed=config.seed)
-    env = Monitor(env, filename=logs_dir)
+    # Create vectorized environment
+    if config.n_envs == 1:
+        # Single env — rospy in parent process, same behavior as before
+        import gymnasium as gym
+        import milliampere_env  # noqa: F401 -- registers MilliAmpere1-v1
+        import rospy
+        from stable_baselines3.common.monitor import Monitor
+
+        rospy.init_node("drl_train", anonymous=True)
+        env = gym.make("MilliAmpere1-v1", config_path=config.env_config)
+        env.reset(seed=config.seed)
+        env = Monitor(env, filename=logs_dir)
+        vec_env = DummyVecEnv([lambda: env])
+    else:
+        # Parallel envs — each subprocess gets its own rospy node + simulator
+        vec_env = SubprocVecEnv(
+            [
+                _make_env(i, config.env_config, config.seed, logs_dir)
+                for i in range(config.n_envs)
+            ],
+            start_method="forkserver",
+        )
 
     # Create model
     model = PPO(
         config.policy,
-        env,
+        vec_env,
         n_steps=config.n_steps,
         learning_rate=config.learning_rate,
         batch_size=config.batch_size,
@@ -172,7 +230,7 @@ def main() -> None:
         final_path = f"{models_dir}/FINAL_PPO_{timestamp}"
         model.save(final_path)
         print(f"Final model saved at {final_path}")
-        env.close()
+        vec_env.close()
 
         # Finish W&B run if active
         try:
