@@ -2,7 +2,7 @@
 
 **Status:** In progress
 **Priority:** High
-**Progress:** 20 / 100
+**Progress:** 40 / 100
 
 ---
 
@@ -166,8 +166,8 @@ Code changes to parallelize training with `SubprocVecEnv`.
 - [x] `finally` block calls `vec_env.close()` (properly shuts down subprocesses)
 - [x] Print `n_envs` in startup banner
 - [x] All 40 DRL unit tests pass
-- [ ] Test N=1 regression in Docker (single sim)
-- [ ] Test N=4 parallel in Docker (4 sims)
+- [x] Test N=1 regression in Docker — single env, rospy in parent, episodes complete, PPO logs
+- [x] Test N=4 parallel in Docker — 4 envs with different targets, all connected to sim_0-3, PPO logging active
 
 **Implementation notes:**
 - `Monitor` wraps each env **inside** the factory (not `VecMonitor` outside) — avoids double-counting episode stats.
@@ -175,6 +175,8 @@ Code changes to parallelize training with `SubprocVecEnv`.
 - `_make_env` is a module-level function (not a closure inside `main`) so `cloudpickle` can serialize it for `SubprocVecEnv`.
 - `DPMetricsCallback` was previously a no-op — the keys it checked (`position_error`, `heading_error`, `total_thrust`) don't exist in `MilliAmpereEnv._get_info()`. Now uses actual keys: `epsilon` (body-frame error) and `thrusters` (RPM setpoints).
 - `total_timesteps` counts across all envs — with N=4 and 500k timesteps, training finishes in ~125k wall-clock steps per env.
+- `batch_size=64` divides `n_steps * n_envs` evenly for both N=1 (2048/64=32) and N=4 (8192/64=128). With N=4 there are 4x more gradient steps per policy update — consider reducing `n_steps` to 512 to keep the same buffer size if desired.
+- `BrokenPipeError` on forced shutdown (e.g. `timeout`, `kill`) is expected: subprocesses try to send data to the closed parent pipe. Normal `Ctrl+C` shuts down cleanly via the SIGINT handler.
 
 ### Phase 3 -- Parallel Evaluation
 
