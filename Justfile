@@ -96,10 +96,21 @@ compose-local:
 compose-remote remote_ip:
     cd docker && python3 generate_compose.py remote --remote-ip {{remote_ip}}
 
+# Generate docker-compose for parallel training (N simulator instances)
+compose-parallel n_envs="4":
+    cd docker && python3 generate_compose.py parallel --n-envs {{n_envs}}
+
 # Build all Docker images (base first, then drl/xai in parallel; pass extra args like --no-cache)
 build *args:
     docker compose -f docker/docker-compose.yml -f docker/docker-compose.nvidia.yml build base {{args}}
     docker compose -f docker/docker-compose.yml -f docker/docker-compose.nvidia.yml build drl xai {{args}}
+
+# Build all images for parallel training (sim base → sim built → base → drl/xai)
+build-parallel *args:
+    docker build -t milliampere-sim:latest external/milliampere/ {{args}}
+    docker build -t milliampere-sim-built:latest -f docker/Dockerfile.simulator . {{args}}
+    docker compose -f docker/docker-compose.yml build base {{args}}
+    docker compose -f docker/docker-compose.yml build drl xai {{args}}
 
 # Start containers (software rendering, works everywhere)
 up:
@@ -109,9 +120,17 @@ up:
 up-gpu:
     docker compose -f docker/docker-compose.yml -f docker/docker-compose.nvidia.yml up -d
 
+# Start parallel training infrastructure (N simulators + drl + xai)
+up-parallel:
+    docker compose -f docker/docker-compose-parallel.yml up -d
+
 # Stop containers
 down:
     docker compose -f docker/docker-compose.yml down
+
+# Stop parallel training infrastructure
+down-parallel:
+    docker compose -f docker/docker-compose-parallel.yml down
 
 # --- Release ---
 

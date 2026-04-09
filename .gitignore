@@ -50,3 +50,4 @@ web/dist/
 
 # Docker
 docker/.env.local
+docker/docker-compose-parallel.yml

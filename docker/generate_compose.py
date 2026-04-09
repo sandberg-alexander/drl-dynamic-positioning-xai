@@ -1,14 +1,16 @@
 import argparse
-import yaml
 import sys
 import socket
 import re
 from pathlib import Path
 
+import yaml
+
 # --- Configuration ---
 _SCRIPT_DIR = Path(__file__).resolve().parent
 TEMPLATE_FILE = str(_SCRIPT_DIR / "docker-compose-template.yml")
 OUTPUT_FILE = str(_SCRIPT_DIR / "docker-compose.yml")
+PARALLEL_OUTPUT_FILE = str(_SCRIPT_DIR / "docker-compose-parallel.yml")
 LOCAL_SIM_SERVICE_NAME = "simulator_local"
 # --- Placeholders ---
 MASTER_URI_PLACEHOLDER = "ROS_MASTER_URI_PLACEHOLDER"
@@ -246,14 +248,196 @@ def generate_laptop_compose(mode, remote_ip=None, local_ip=None):
         sys.exit(1)
 
 
+def generate_parallel_compose(n_envs):
+    """Generate a docker-compose file for parallel training with N simulator instances.
+
+    Each simulator runs in its own container with an independent roscore.
+    The drl container connects to all simulators via a shared bridge network.
+    """
+    print("--- Generating Parallel Training Configuration ---")
+    print(f"Number of environments: {n_envs}")
+
+    network_name = "ros_parallel_net"
+
+    # --- Simulator service template ---
+    # Use ';' (not '&&') between source and backgrounded commands.
+    # With '&&', bash groups 'source ... && roscore &' as one background job,
+    # leaving 'roslaunch' in a subshell without the sourced environment.
+    # With ';', sources run in the main shell before anything is backgrounded.
+    sim_command = (
+        "bash -c '"
+        "source /opt/ros/noetic/setup.bash; "
+        "source /workspace/devel/setup.bash; "
+        "roscore & "
+        "sleep 3; "
+        "roslaunch /workspace/src/simulator.launch & "
+        "tail -f /dev/null"
+        "'"
+    )
+
+    # Health check uses 'bash -c' because Docker runs CMD-SHELL with /bin/sh,
+    # which doesn't support 'source' (a bashism).
+    sim_healthcheck = {
+        "test": [
+            "CMD-SHELL",
+            "bash -c 'source /opt/ros/noetic/setup.bash && rostopic list > /dev/null 2>&1'",
+        ],
+        "interval": "5s",
+        "timeout": "5s",
+        "retries": 10,
+        "start_period": "30s",
+    }
+
+    sim_env_common = {
+        "LD_LIBRARY_PATH": "/workspace/src/ma27",
+        "ROS_LANG_DISABLE": "genlisp;gennodejs;geneus",
+        "ROS_LOG_DIR": "/logging/node_logs",
+        "CATKIN_ENABLE_TESTING": "0",
+    }
+
+    # --- Build services dict ---
+    services = {}
+
+    # Base image (build-only, required by drl/xai)
+    services["base"] = {
+        "build": {"context": "..", "dockerfile": "docker/Dockerfile.base"},
+        "image": "my-ros-base:latest",
+    }
+
+    # N simulator services
+    sim_depends = {}
+    for i in range(n_envs):
+        name = f"sim_{i}"
+        sim_depends[name] = {"condition": "service_healthy"}
+        services[name] = {
+            "image": "milliampere-sim-built:latest",
+            "container_name": name,
+            "hostname": name,
+            "environment": {
+                **sim_env_common,
+                "ROS_MASTER_URI": f"http://{name}:11311",
+                "ROS_HOSTNAME": name,
+            },
+            "command": sim_command,
+            "healthcheck": sim_healthcheck,
+            "networks": [network_name],
+            "init": True,
+        }
+
+    # DRL training service
+    drl_depends = {"base": {"condition": "service_started"}}
+    drl_depends.update(sim_depends)
+    services["drl"] = {
+        "build": {"context": "..", "dockerfile": "docker/Dockerfile.drl"},
+        "container_name": "drl",
+        "hostname": "drl_container",
+        "depends_on": drl_depends,
+        "environment": {
+            "N_ENVS": str(n_envs),
+            "ROS_MASTER_URI": "http://sim_0:11311",
+        },
+        "volumes": [
+            "../data/models:/app/models:rw",
+            "../data/xai_samples:/app/xai_samples:rw",
+            "../data/runs:/app/runs:rw",
+            "../drl/src/milliampere_drl:"
+            "/usr/local/lib/python3.8/dist-packages/milliampere_drl:ro",
+            "../configs:/app/configs:ro",
+            "../milliampere_dp/src/milliampere_dp:"
+            "/usr/local/lib/python3.8/dist-packages/milliampere_dp:ro",
+            "../ros_packages/milliampere_env/src/milliampere_env:"
+            "/root/catkin_ws/src/milliampere_env/src/milliampere_env:ro",
+        ],
+        "command": (
+            "bash -c '"
+            "source /root/catkin_ws/devel/setup.bash && "
+            "source /opt/ros/noetic/setup.bash && "
+            "tail -f /dev/null"
+            "'"
+        ),
+        "networks": [network_name],
+        "init": True,
+    }
+
+    # XAI service (optional, connects to sim_0 by default)
+    xai_depends = {"base": {"condition": "service_started"}}
+    xai_depends["sim_0"] = {"condition": "service_healthy"}
+    services["xai"] = {
+        "build": {"context": "..", "dockerfile": "docker/Dockerfile.xai"},
+        "container_name": "xai",
+        "hostname": "xai_container",
+        "depends_on": xai_depends,
+        "environment": {
+            "ROS_MASTER_URI": "http://sim_0:11311",
+        },
+        "volumes": [
+            "../data/models:/app/models:rw",
+            "../data/xai_samples:/app/xai_samples:rw",
+            "../data/runs:/app/runs:rw",
+            "../xai/src/milliampere_xai:"
+            "/usr/local/lib/python3.8/dist-packages/milliampere_xai:ro",
+            "../configs:/app/configs:ro",
+            "../milliampere_dp/src/milliampere_dp:"
+            "/usr/local/lib/python3.8/dist-packages/milliampere_dp:ro",
+            "../ros_packages/milliampere_env/src/milliampere_env:"
+            "/root/catkin_ws/src/milliampere_env/src/milliampere_env:ro",
+        ],
+        "ports": ["8080:8080"],
+        "command": (
+            "bash -c '"
+            "source /root/catkin_ws/devel/setup.bash && "
+            "source /opt/ros/noetic/setup.bash && "
+            "tail -f /dev/null"
+            "'"
+        ),
+        "networks": [network_name],
+        "init": True,
+    }
+
+    # --- Assemble full compose structure ---
+    compose = {
+        "services": services,
+        "networks": {network_name: {"driver": "bridge"}},
+    }
+
+    # --- Write output ---
+    try:
+        with open(PARALLEL_OUTPUT_FILE, "w") as f:
+            f.write(
+                f"# Auto-generated parallel training config ({n_envs} simulators).\n"
+                f"# Generated by: python3 generate_compose.py parallel --n-envs {n_envs}\n"
+                f"# Do not edit manually — re-run the generator instead.\n\n"
+            )
+            yaml.dump(compose, f, sort_keys=False, default_flow_style=False, width=1000)
+        print(f"Successfully generated '{PARALLEL_OUTPUT_FILE}'.")
+    except Exception as e:
+        print(f"Error writing output file: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    # Print summary
+    print("\nServices:")
+    print(f"  Simulators: {', '.join(f'sim_{i}' for i in range(n_envs))}")
+    print(f"  Training:   drl (N_ENVS={n_envs})")
+    print("  XAI:        xai (connected to sim_0)")
+    print(f"  Network:    {network_name}")
+    print("\nUsage:")
+    print("  just build-parallel         # Build all images")
+    print("  just up-parallel            # Start infrastructure")
+    print("  just down-parallel          # Stop infrastructure")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description=f"Generate {OUTPUT_FILE} from {TEMPLATE_FILE} for local or remote ROS connection."
+        description="Generate docker-compose files for local, remote, or parallel ROS configurations."
     )
     parser.add_argument(
         "mode",
-        choices=["local", "remote"],  # Simplified modes
-        help="Specify the mode: 'local' (run simulator locally), 'remote' (connect to remote ROS master).",
+        choices=["local", "remote", "parallel"],
+        help=(
+            "Specify the mode: 'local' (run simulator locally), "
+            "'remote' (connect to remote ROS master), "
+            "'parallel' (N simulator instances for parallel training)."
+        ),
     )
     parser.add_argument(
         "--remote-ip", help="IP address of the remote PC (required for 'remote' mode)."
@@ -262,11 +446,21 @@ if __name__ == "__main__":
         "--local-ip",
         help="IP address of this Laptop (required for 'remote' mode, attempts auto-detection if not provided).",
     )
+    parser.add_argument(
+        "--n-envs",
+        type=int,
+        default=4,
+        help="Number of parallel simulator instances (default: 4, for 'parallel' mode).",
+    )
 
     args = parser.parse_args()
 
-    # Validate remote_ip requirement
     if args.mode == "remote" and not args.remote_ip:
         parser.error("--remote-ip is required when mode is 'remote'")
 
-    generate_laptop_compose(args.mode, args.remote_ip, args.local_ip)
+    if args.mode == "parallel":
+        if args.n_envs < 1:
+            parser.error("--n-envs must be at least 1")
+        generate_parallel_compose(args.n_envs)
+    else:
+        generate_laptop_compose(args.mode, args.remote_ip, args.local_ip)

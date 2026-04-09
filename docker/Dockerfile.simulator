@@ -1,0 +1,20 @@
+# Pre-built simulator for parallel training.
+# Extends the milliampere simulator base image with a pre-compiled
+# catkin workspace, eliminating the startup catkin_make step.
+#
+# Build order:
+#   1. docker build -t milliampere-sim:latest external/milliampere/
+#   2. docker build -t milliampere-sim-built:latest -f docker/Dockerfile.simulator .
+#
+# Or via Justfile:
+#   just build-parallel
+
+FROM milliampere-sim:latest
+
+# Copy workspace source into the image (not volume-mounted)
+COPY external/milliampere/workspace /workspace
+
+# Build the catkin workspace at image build time
+RUN /bin/bash -c 'source /opt/ros/noetic/setup.bash && \
+    cd /workspace && \
+    CATKIN_ENABLE_TESTING=0 catkin_make'
